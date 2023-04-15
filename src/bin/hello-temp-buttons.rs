@@ -46,7 +46,7 @@ fn main() -> ! {
     let mut temp = Temp::new(board.TEMP);
 
     let mut current_unit = TempUnit::Celsius;
-    let button = Button::new(pins.p0_11.degrade());
+    let mut button = Button::new(pins.p0_11.degrade());
     let mut periodic_timer = Timer::periodic(board.TIMER0);
 
     loop {
@@ -55,7 +55,7 @@ fn main() -> ! {
         let converted_symbol = current_unit.get_symbol();
         defmt::info!("{=f32} {}", converted_temp, converted_symbol);
 
-        if button.is_pressed() {
+        if button.check_rising_edge() {
             current_unit = match current_unit {
                 TempUnit::Fahrenheit => TempUnit::Kelvin,
                 TempUnit::Kelvin => TempUnit::Celsius,
