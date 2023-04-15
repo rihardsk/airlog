@@ -22,6 +22,7 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 # TODO(4) enter your HAL here
 # some-hal = "1.2.3"
 nrf52840-hal = "0.16.0"
+embedded-hal = "0.2.7"
 
 [dev-dependencies]
 defmt-test = "0.3"
