@@ -1,27 +1,13 @@
 #![no_main]
 #![no_std]
 
-use embedded_hal::{blocking::delay::DelayMs, digital::v2::OutputPin};
-use hal::{gpio::{Output, Pin, PushPull, PullUp, Input}, prelude::InputPin};
+use embedded_hal::digital::v2::OutputPin;
 use nrf52840_hal::{
     self as hal,
     gpio::{p0::Parts as P0Parts, Level},
-    Timer,
 };
 
-use airlog as _; // global logger + panicking-behavior + memory layout
-
-pub struct Button(Pin<Input<PullUp>>);
-
-impl Button {
-    fn new<Mode>(pin: Pin<Mode>) -> Self {
-        Button(pin.into_pullup_input())
-    }
-
-    fn is_pressed(&self) -> bool {
-        self.0.is_low().unwrap()
-    }
-}
+use airlog::{self as _, peripherals::Button}; // global logger + panicking-behavior + memory layout
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
