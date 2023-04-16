@@ -2,6 +2,7 @@
 #![no_std]
 
 pub mod peripherals;
+pub mod logic;
 
 use defmt_rtt as _; // global logger
 

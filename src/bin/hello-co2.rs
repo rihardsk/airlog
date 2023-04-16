@@ -13,6 +13,7 @@ use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, Timer};
 use airlog::{
     self as _,
     peripherals::{scd30, Button, LEDControl, PwmLEDControl, SCD30},
+    logic,
 }; // global logger + panicking-behavior + memory layout
 
 #[cortex_m_rt::entry]
@@ -59,6 +60,14 @@ fn main() -> ! {
     led.set_color(0, 0, 0);
     periodic_timer.delay_ms(300_u32);
 
+    for i in 0 ..= 100 {
+        let fraction = i as f32 / 100.;
+        let (r, g, b) = logic::colormap::rdylgn_map_rgb(fraction);
+        led.set_color(r, g, b);
+        periodic_timer.delay_ms(30_u32);
+    }
+    periodic_timer.delay_ms(100_u32);
+
     scd30.start_continuous_measurement(1023).unwrap();
 
     loop {
@@ -69,13 +78,19 @@ fn main() -> ! {
             }
         }
         let reading = scd30.read_measurement().unwrap();
-        if reading.co2 < 1000_f32 {
-            led.set_color(0, 255, 0);
-        } else if reading.co2 < 1600_f32 {
-            led.set_color(255, 255, 0);
-        } else {
-            led.set_color(255, 0, 0);
-        }
+        // if reading.co2 < 1000_f32 {
+        //     led.set_color(0, 255, 0);
+        // } else if reading.co2 < 1600_f32 {
+        //     led.set_color(255, 255, 0);
+        // } else {
+        //     led.set_color(255, 0, 0);
+        // }
+
+        // current baseline ppm is 424
+        let fraction = (reading.co2 - 424.) / (2000 - 424) as f32;
+        let fraction = fraction.max(0.);
+        let (r, g, b) = logic::colormap::rdylgn_map_rgb(fraction);
+        led.set_color(r, g, b);
 
         defmt::info!(
             "
