@@ -41,11 +41,11 @@ const SIMPLE_DATA: [(f32, f32, f32); 4] = [
 type ColorSegment = (f32, f32, f32, f32);
 #[rustfmt::skip]
 const SIMPLE_DATA_WITH_POSITION: [ColorSegment; 4] = [
-    // Set some points relative to some specific co2 values. We take 443 ppm as
-    // base and 2000 ppm as the maximum
+    // Set some points relative to some specific co2 values. We take 424 ppm as
+    // base and 3000 ppm as the maximum
     (0., 1., 0., 0.),
-    (1., 1., 0., ((1000. - 423.) / (2000. - 423.))),
-    (1., 0., 0., ((1600. - 423.) / (2000. - 423.))),
+    (1., 1., 0., ((1000. - 424.) / (3000. - 424.))),
+    (1., 0., 0., ((1600. - 424.) / (3000. - 424.))),
     (0., 0., 1., 1.),
 ];
 

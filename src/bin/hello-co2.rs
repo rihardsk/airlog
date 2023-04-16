@@ -86,7 +86,7 @@ fn main() -> ! {
         // }
 
         // current baseline ppm is 424
-        let fraction = (reading.co2 - 424.) / (2000 - 424) as f32;
+        let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
         let fraction = fraction.max(0.);
         let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
         led.set_color(r, g, b);
