@@ -30,12 +30,24 @@ const RDYLGN_DATA: [(f32, f32, f32); 11] = [
     (0.647_058_84, 0.0, 0.149_019_61),
 ];
 
+#[rustfmt::skip]
 const SIMPLE_DATA: [(f32, f32, f32); 4] = [
-    (0., 1., 0.), // 400ppm
+    (0., 1., 0.),
     (1., 1., 0.),
     (1., 0., 0.),
-    (0., 0., 1.), // 2000ppm
-    ];
+    (0., 0., 1.),
+];
+
+type ColorSegment = (f32, f32, f32, f32);
+#[rustfmt::skip]
+const SIMPLE_DATA_WITH_POSITION: [ColorSegment; 4] = [
+    // Set some points relative to some specific co2 values. We take 443 ppm as
+    // base and 2000 ppm as the maximum
+    (0., 1., 0., 0.),
+    (1., 1., 0., ((1000. - 423.) / (2000. - 423.))),
+    (1., 0., 0., ((1600. - 423.) / (2000. - 423.))),
+    (0., 0., 1., 1.),
+];
 
 pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f32, f32, f32) {
     let max_idx = colors.len() - 1;
@@ -49,6 +61,41 @@ pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f
     let r_adjust = (r_above - r_below) * remainder;
     let g_adjust = (g_above - g_below) * remainder;
     let b_adjust = (b_above - b_below) * remainder;
+
+    (r_below + r_adjust, g_below + g_adjust, b_below + b_adjust)
+}
+
+pub fn linear_position_interpolating_map(
+    colors: &[ColorSegment],
+    fraction: f32,
+) -> (f32, f32, f32) {
+    let mut below: Option<ColorSegment> = None;
+    let mut above: Option<ColorSegment> = None;
+    // Find the first distance (4th component) that's greater than the fraction
+    for color in colors {
+        if fraction <= color.3 {
+            above = Some(*color);
+            break;
+        }
+        below = Some(*color);
+    }
+    let (below, above) = match (below, above) {
+        // Inputs were faulty, come up with something generic
+        (None, None) => ((0., 0., 0., 0.), (1., 1., 1., 1.)),
+        (None, Some(x)) => (x, x),
+        (Some(x), None) => (x, x),
+        (Some(x), Some(y)) => (x, y),
+    };
+
+    let (r_below, g_below, b_below, loc_below) = below;
+    let (r_above, g_above, b_above, loc_above) = above;
+
+    let interpolation = (fraction - loc_below) / (loc_above - loc_below);
+    let interpolation = interpolation.min(1.).max(0.);
+
+    let r_adjust = (r_above - r_below) * interpolation;
+    let g_adjust = (g_above - g_below) * interpolation;
+    let b_adjust = (b_above - b_below) * interpolation;
 
     (r_below + r_adjust, g_below + g_adjust, b_below + b_adjust)
 }
@@ -72,4 +119,12 @@ pub fn simple_map(fraction: f32) -> (f32, f32, f32) {
 
 pub fn simple_map_rgb(fraction: f32) -> (u8, u8, u8) {
     fractions_to_rgb(simple_map(fraction))
+}
+
+pub fn smart_map(fraction: f32) -> (f32, f32, f32) {
+    linear_position_interpolating_map(&SIMPLE_DATA_WITH_POSITION, fraction)
+}
+
+pub fn smart_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(smart_map(fraction))
 }
