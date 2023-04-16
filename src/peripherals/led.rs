@@ -1,8 +1,34 @@
 use hal::{
     gpio::{Input, Level, Output, Pin, PullUp, PushPull},
     prelude::{InputPin, OutputPin},
+    pwm::{Instance, Pwm, Channel},
 };
 use nrf52840_hal as hal;
+
+pub struct PwmLEDControl<T: Instance> {
+    pwm: Pwm<T>,
+}
+
+impl<T> PwmLEDControl<T>
+where
+    T: Instance,
+{
+    // TODO: take individual channels
+    pub fn new(pwm: Pwm<T>) -> Self {
+        pwm.set_max_duty(255);
+        PwmLEDControl { pwm }
+    }
+
+    pub fn set_color(&mut self, red: u8, green: u8, blue: u8) {
+        self.pwm.set_duty_on(Channel::C0, red as u16);
+        self.pwm.set_duty_on(Channel::C1, green as u16);
+        self.pwm.set_duty_on(Channel::C2, blue as u16);
+    }
+
+    pub fn free(self) -> Pwm<T> {
+        self.pwm
+    }
+}
 
 pub struct LEDControl {
     r: Pin<Output<PushPull>>,

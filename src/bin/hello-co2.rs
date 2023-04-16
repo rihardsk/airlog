@@ -3,12 +3,16 @@
 
 use cortex_m::prelude::{_embedded_hal_blocking_delay_DelayMs, _embedded_hal_timer_CountDown};
 use embedded_hal::blocking::i2c;
-use hal::{twim, Temp, Twim};
+use hal::{
+    gpio::Level,
+    pwm::{self, Pwm},
+    twim, Temp, Twim,
+};
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, Timer};
 
 use airlog::{
     self as _,
-    peripherals::{scd30, Button, LEDControl, SCD30},
+    peripherals::{scd30, Button, LEDControl, PwmLEDControl, SCD30},
 }; // global logger + panicking-behavior + memory layout
 
 #[cortex_m_rt::entry]
@@ -21,10 +25,17 @@ fn main() -> ! {
 
     let mut periodic_timer = Timer::periodic(board.TIMER0);
 
-    let pin_r = pins.p0_03.degrade();
-    let pin_b = pins.p0_04.degrade();
-    let pin_g = pins.p0_28.degrade();
-    let mut led = LEDControl::new(pin_r, pin_g, pin_b);
+    let pwm = Pwm::new(board.PWM0);
+
+    let pin_r = pins.p0_03.into_push_pull_output(Level::High).degrade();
+    let pin_b = pins.p0_04.into_push_pull_output(Level::High).degrade();
+    let pin_g = pins.p0_28.into_push_pull_output(Level::High).degrade();
+
+    pwm.set_output_pin(pwm::Channel::C0, pin_r);
+    pwm.set_output_pin(pwm::Channel::C1, pin_g);
+    pwm.set_output_pin(pwm::Channel::C2, pin_b);
+
+    let mut led = PwmLEDControl::new(pwm);
 
     let scl = pins.p0_30.into_floating_input().degrade();
     let sda = pins.p0_31.into_floating_input().degrade();
@@ -39,12 +50,14 @@ fn main() -> ! {
         version.minor
     );
 
-    // led.set_state(true, false, false);
-    // periodic_timer.delay_ms(100_u32);
-    // led.set_state(false, true, false);
-    // periodic_timer.delay_ms(100_u32);
-    // led.set_state(false, false, true);
-    // periodic_timer.delay_ms(100_u32);
+    led.set_color(255, 0, 0);
+    periodic_timer.delay_ms(300_u32);
+    led.set_color(0, 255, 0);
+    periodic_timer.delay_ms(300_u32);
+    led.set_color(0, 0, 255);
+    periodic_timer.delay_ms(300_u32);
+    led.set_color(0, 0, 0);
+    periodic_timer.delay_ms(300_u32);
 
     scd30.start_continuous_measurement(1023).unwrap();
 
@@ -57,11 +70,11 @@ fn main() -> ! {
         }
         let reading = scd30.read_measurement().unwrap();
         if reading.co2 < 1000_f32 {
-            led.set_state(false, true, false);
+            led.set_color(0, 255, 0);
         } else if reading.co2 < 1600_f32 {
-            led.set_state(true, true, false);
+            led.set_color(255, 255, 0);
         } else {
-            led.set_state(true, false, false);
+            led.set_color(255, 0, 0);
         }
 
         defmt::info!(
