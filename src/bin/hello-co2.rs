@@ -22,8 +22,8 @@ fn main() -> ! {
     let mut periodic_timer = Timer::periodic(board.TIMER0);
 
     let pin_r = pins.p0_03.degrade();
-    let pin_g = pins.p0_04.degrade();
-    let pin_b = pins.p0_28.degrade();
+    let pin_b = pins.p0_04.degrade();
+    let pin_g = pins.p0_28.degrade();
     let mut led = LEDControl::new(pin_r, pin_g, pin_b);
 
     let scl = pins.p0_30.into_floating_input().degrade();
@@ -39,6 +39,13 @@ fn main() -> ! {
         version.minor
     );
 
+    // led.set_state(true, false, false);
+    // periodic_timer.delay_ms(100_u32);
+    // led.set_state(false, true, false);
+    // periodic_timer.delay_ms(100_u32);
+    // led.set_state(false, false, true);
+    // periodic_timer.delay_ms(100_u32);
+
     scd30.start_continuous_measurement(1023).unwrap();
 
     loop {
@@ -52,7 +59,7 @@ fn main() -> ! {
         if reading.co2 < 1000_f32 {
             led.set_state(false, true, false);
         } else if reading.co2 < 1600_f32 {
-            led.set_state(false, true, true);
+            led.set_state(true, true, false);
         } else {
             led.set_state(true, false, false);
         }
