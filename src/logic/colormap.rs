@@ -30,6 +30,13 @@ const RDYLGN_DATA: [(f32, f32, f32); 11] = [
     (0.647_058_84, 0.0, 0.149_019_61),
 ];
 
+const SIMPLE_DATA: [(f32, f32, f32); 4] = [
+    (0., 1., 0.), // 400ppm
+    (1., 1., 0.),
+    (1., 0., 0.),
+    (0., 0., 1.), // 2000ppm
+    ];
+
 pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f32, f32, f32) {
     let max_idx = colors.len() - 1;
     let float_idx: f32 = (max_idx as f32 * fraction).min(max_idx as f32);
@@ -57,4 +64,12 @@ pub fn rdylgn_map(fraction: f32) -> (f32, f32, f32) {
 
 pub fn rdylgn_map_rgb(fraction: f32) -> (u8, u8, u8) {
     fractions_to_rgb(rdylgn_map(fraction))
+}
+
+pub fn simple_map(fraction: f32) -> (f32, f32, f32) {
+    linear_interpolating_map(&SIMPLE_DATA, fraction)
+}
+
+pub fn simple_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(simple_map(fraction))
 }

@@ -62,7 +62,7 @@ fn main() -> ! {
 
     for i in 0 ..= 100 {
         let fraction = i as f32 / 100.;
-        let (r, g, b) = logic::colormap::rdylgn_map_rgb(fraction);
+        let (r, g, b) = logic::colormap::simple_map_rgb(fraction);
         led.set_color(r, g, b);
         periodic_timer.delay_ms(30_u32);
     }
@@ -89,7 +89,7 @@ fn main() -> ! {
         // current baseline ppm is 424
         let fraction = (reading.co2 - 424.) / (2000 - 424) as f32;
         let fraction = fraction.max(0.);
-        let (r, g, b) = logic::colormap::rdylgn_map_rgb(fraction);
+        let (r, g, b) = logic::colormap::simple_map_rgb(fraction);
         led.set_color(r, g, b);
 
         defmt::info!(
