@@ -1,5 +1,8 @@
 use crc_all::Crc;
-use nrf52840_hal::{twim::{Instance, Error}, Twim};
+use nrf52840_hal::{
+    twim::{Error, Instance},
+    Twim,
+};
 
 pub struct SCD30<T: Instance>(Twim<T>);
 
@@ -8,6 +11,12 @@ static DEFAULT_ADDRESS: u8 = 0x61;
 pub struct FirmwareVersion {
     pub major: u8,
     pub minor: u8,
+}
+
+pub struct SensorReading {
+    pub co2: f32,
+    pub temperature: f32,
+    pub rel_humidity: f32,
 }
 
 impl<T> SCD30<T>
@@ -59,5 +68,22 @@ where
 
         // TODO: check crc
         Ok(u16::from_be_bytes([buf[0], buf[1]]) == 1)
+    }
+
+    pub fn read_measurement(&mut self) -> Result<SensorReading, Error> {
+        let command: [u8; 2] = [0x03, 0x00];
+        self.0.write(DEFAULT_ADDRESS, &command)?;
+        let mut buf = [0; 18];
+        self.0.read(DEFAULT_ADDRESS, &mut buf)?;
+
+        let co2 = f32::from_be_bytes([buf[0], buf[1], buf[3], buf[4]]);
+        let temperature = f32::from_be_bytes([buf[6], buf[7], buf[9], buf[10]]);
+        let rel_humidity = f32::from_be_bytes([buf[12], buf[13], buf[15], buf[16]]);
+
+        Ok(SensorReading {
+            co2,
+            temperature,
+            rel_humidity,
+        })
     }
 }

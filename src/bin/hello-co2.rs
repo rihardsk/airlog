@@ -65,31 +65,42 @@ fn main() -> ! {
     scd30.start_continuous_measurement(1023).unwrap();
 
     loop {
-        if scd30.data_ready().unwrap() {
-            defmt::info!("CO2 data ready.");
-            break;
+        // periodic_timer.start(1000_u32);
+        loop {
+            if scd30.data_ready().unwrap() {
+                break;
+            }
         }
-    }
+        let reading = scd30.read_measurement().unwrap();
+        defmt::info!(
+            "
+            CO2 {=f32} ppm
+            Temperature {=f32} °C
+            Rel. humidity {=f32} %
+        ",
+            reading.co2,
+            reading.temperature,
+            reading.rel_humidity
+        );
+        periodic_timer.delay_ms(5000_u32);
 
-    loop {
-        periodic_timer.start(1000_u32);
-        if (millis % 1000) == 0 {
-            let temperature: f32 = temp.measure().to_num();
-            let converted_temp = current_unit.convert_from_celsius(temperature);
-            let converted_symbol = current_unit.get_symbol();
-            defmt::info!("{=f32} {}", converted_temp, converted_symbol);
-        }
+        // if (millis % 1000) == 0 {
+        //     let temperature: f32 = temp.measure().to_num();
+        //     let converted_temp = current_unit.convert_from_celsius(temperature);
+        //     let converted_symbol = current_unit.get_symbol();
+        //     defmt::info!("{=f32} {}", converted_temp, converted_symbol);
+        // }
 
-        if (millis % 5) == 0 && button.check_rising_edge() {
-            current_unit = match current_unit {
-                TempUnit::Fahrenheit => TempUnit::Kelvin,
-                TempUnit::Kelvin => TempUnit::Celsius,
-                TempUnit::Celsius => TempUnit::Fahrenheit,
-            };
-            defmt::info!("Unit changed to {}", current_unit);
-        }
+        // if (millis % 5) == 0 && button.check_rising_edge() {
+        //     current_unit = match current_unit {
+        //         TempUnit::Fahrenheit => TempUnit::Kelvin,
+        //         TempUnit::Kelvin => TempUnit::Celsius,
+        //         TempUnit::Celsius => TempUnit::Fahrenheit,
+        //     };
+        //     defmt::info!("Unit changed to {}", current_unit);
+        // }
 
-        nb::block!(periodic_timer.wait()).unwrap();
-        millis = millis.overflowing_add(1).0;
+        // nb::block!(periodic_timer.wait()).unwrap();
+        // millis = millis.overflowing_add(1).0;
     }
 }
