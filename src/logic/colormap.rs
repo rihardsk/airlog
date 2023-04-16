@@ -30,15 +30,15 @@ const RDYLGN_DATA: [(f32, f32, f32); 11] = [
     (0.647_058_84, 0.0, 0.149_019_61),
 ];
 
-pub fn rdylgn_map(fraction: f32) -> (f32, f32, f32) {
-    let max_idx = RDYLGN_DATA.len() - 1;
+pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f32, f32, f32) {
+    let max_idx = colors.len() - 1;
     let float_idx: f32 = (max_idx as f32 * fraction).min(max_idx as f32);
     let below = float_idx.floor() as usize;
     let above = float_idx.ceil() as usize;
     let remainder = float_idx - below as f32;
 
-    let (r_below, g_below, b_below) = RDYLGN_DATA[below];
-    let (r_above, g_above, b_above) = RDYLGN_DATA[above];
+    let (r_below, g_below, b_below) = colors[below];
+    let (r_above, g_above, b_above) = colors[above];
     let r_adjust = (r_above - r_below) * remainder;
     let g_adjust = (g_above - g_below) * remainder;
     let b_adjust = (b_above - b_below) * remainder;
@@ -46,7 +46,15 @@ pub fn rdylgn_map(fraction: f32) -> (f32, f32, f32) {
     (r_below + r_adjust, g_below + g_adjust, b_below + b_adjust)
 }
 
-pub fn rdylgn_map_rgb(fraction: f32) -> (u8, u8, u8) {
-    let (r, g, b) = rdylgn_map(fraction);
+fn fractions_to_rgb(colors: (f32, f32, f32)) -> (u8, u8, u8) {
+    let (r, g, b) = colors;
     ((255. * r) as u8, (255. * g) as u8, (255. * b) as u8)
+}
+
+pub fn rdylgn_map(fraction: f32) -> (f32, f32, f32) {
+    linear_interpolating_map(&RDYLGN_DATA, fraction)
+}
+
+pub fn rdylgn_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(rdylgn_map(fraction))
 }
