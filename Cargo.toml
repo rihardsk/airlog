@@ -24,6 +24,7 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 nrf52840-hal = "0.16.0"
 embedded-hal = "0.2.7"
 nb = "1.1.0"
+crc_all = "0.2.2"
 
 [dev-dependencies]
 defmt-test = "0.3"
