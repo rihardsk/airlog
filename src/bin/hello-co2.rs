@@ -37,19 +37,6 @@ fn main() -> ! {
 
     let mut led = PwmLEDControl::new(pwm);
 
-    let scl = pins.p0_30.into_floating_input().degrade();
-    let sda = pins.p0_31.into_floating_input().degrade();
-    let twim_pins = twim::Pins { scl, sda };
-    let i2c = Twim::new(board.TWIM0, twim_pins, twim::Frequency::K100);
-
-    let mut scd30 = SCD30::new(i2c);
-    let version = scd30.get_firmware_version().unwrap();
-    defmt::info!(
-        "SCD30 firmware version: {=u8}.{=u8}",
-        version.major,
-        version.minor
-    );
-
     led.set_color(255, 0, 0);
     periodic_timer.delay_ms(300_u32);
     led.set_color(0, 255, 0);
@@ -58,6 +45,21 @@ fn main() -> ! {
     periodic_timer.delay_ms(300_u32);
     led.set_color(0, 0, 0);
     periodic_timer.delay_ms(300_u32);
+
+    let scl = pins.p0_30.into_floating_input().degrade();
+    let sda = pins.p0_31.into_floating_input().degrade();
+    let twim_pins = twim::Pins { scl, sda };
+    let i2c = Twim::new(board.TWIM0, twim_pins, twim::Frequency::K100);
+
+    defmt::info!("Setting up SCD30");
+
+    let mut scd30 = SCD30::new(i2c);
+    let version = scd30.get_firmware_version().unwrap();
+    defmt::info!(
+        "SCD30 firmware version: {=u8}.{=u8}",
+        version.major,
+        version.minor
+    );
 
     for i in 0..=100 {
         let fraction = i as f32 / 100.;
