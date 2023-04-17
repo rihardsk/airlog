@@ -45,8 +45,8 @@ fn main() -> ! {
     let mut periodic_timer = Timer::periodic(board.TIMER0);
     let mut millis: u32 = 0;
 
+    periodic_timer.start(1000_u32);
     loop {
-        periodic_timer.start(1000_u32);
         if (millis % 1000) == 0 {
             let temperature: f32 = temp.measure().to_num();
             let converted_temp = current_unit.convert_from_celsius(temperature);

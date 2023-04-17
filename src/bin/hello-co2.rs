@@ -8,10 +8,11 @@ use hal::{
     pwm::{self, Pwm},
     twim, Temp, Twim,
 };
+use lcd1602_rs::LCD1602;
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, Timer};
 
 use airlog::{
-    self as _, logic,
+    self as _, logic::{self, duration_timer::DurationTimer},
     peripherals::{scd30, Button, LEDControl, PwmLEDControl, SCD30},
 }; // global logger + panicking-behavior + memory layout
 
@@ -24,6 +25,7 @@ fn main() -> ! {
     let mut temp = Temp::new(board.TEMP);
 
     let mut periodic_timer = Timer::periodic(board.TIMER0);
+    let lcd_timer = DurationTimer(Timer::one_shot(board.TIMER1));
 
     let pwm = Pwm::new(board.PWM0);
 
@@ -69,6 +71,15 @@ fn main() -> ! {
     }
     periodic_timer.delay_ms(100_u32);
 
+    let rs = pins.p0_05.into_push_pull_output(Level::Low).degrade();
+    let en = pins.p0_06.into_push_pull_output(Level::Low).degrade();
+    let d4 = pins.p0_07.into_push_pull_output(Level::Low).degrade();
+    let d5 = pins.p0_08.into_push_pull_output(Level::Low).degrade();
+    let d6 = pins.p0_09.into_push_pull_output(Level::Low).degrade();
+    let d7 = pins.p0_10.into_push_pull_output(Level::Low).degrade();
+
+    let mut lcd = LCD1602::new(en, rs, d4, d5, d6, d7, lcd_timer).unwrap();
+
     scd30.start_continuous_measurement(1023).unwrap();
 
     loop {
@@ -103,6 +114,11 @@ fn main() -> ! {
             reading.temperature,
             reading.rel_humidity
         );
-        periodic_timer.delay_ms(5000_u32);
+
+        lcd.print("Hello world").unwrap();
+        lcd.delay(4_000_000_u64).unwrap();
+        lcd.clear().unwrap();
+        lcd.delay(1_000_000_u64).unwrap();
+        // periodic_timer.delay_ms(5000_u32);
     }
 }
