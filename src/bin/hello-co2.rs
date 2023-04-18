@@ -9,7 +9,7 @@ use hal::{
     pwm::{self, Pwm},
     twim, Temp, Twim,
 };
-use hd44780_driver::{Cursor, CursorBlink, Display, DisplayMode, HD44780};
+use hd44780_driver::{Cursor, CursorBlink, Direction, Display, DisplayMode, HD44780};
 use micromath::F32Ext;
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, gpio::p1::Parts as P1Parts, Timer};
 
@@ -151,6 +151,17 @@ fn main() -> ! {
         lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
         lcd.write_str(&lcd_text, &mut lcd_timer).unwrap();
 
+        lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
+        // TODO: Can't output °, because it's probably part of unicode, not
+        // ascii, See if there's a workaround using the hd44780 font table
+        let temp_text = format_float_measurement(reading.temperature, 2, "C");
+        lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
+
+        lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+        lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+        let humidity_text = format_float_measurement(reading.rel_humidity, 2, "%");
+        lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
+
         periodic_timer.delay_ms(5000_u32);
     }
 }
@@ -163,4 +174,24 @@ fn u32_len(num: u32) -> u8 {
         count += 1;
     }
     count
+}
+
+// TODO: Works only on positive values
+fn format_float_measurement(value: f32, pad_main: u8, unit: &str) -> heapless::String<16> {
+    let mut output: heapless::String<16> = heapless::String::new();
+    let int_part = value.floor() as u32;
+
+    let int_len = u32_len(int_part);
+    for _ in 0..(pad_main - int_len) {
+        output.push_str(" ").unwrap();
+    }
+    let frac_part = (value.fract() * 100.) as u32;
+    let mut frac_text: heapless::String<2> = heapless::String::new();
+    if frac_part < 10 {
+        frac_text.push_str("0").unwrap();
+    }
+    ufmt::uwrite!(frac_text, "{}", frac_part).unwrap();
+    ufmt::uwrite!(output, "{}.{} {}", int_part, frac_text.as_str(), unit).unwrap();
+
+    output
 }
