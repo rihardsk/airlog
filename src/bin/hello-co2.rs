@@ -35,9 +35,9 @@ fn main() -> ! {
 
     let pwm = Pwm::new(board.PWM0);
 
-    let pin_r = pins_0.p0_03.into_push_pull_output(Level::High).degrade();
-    let pin_b = pins_0.p0_04.into_push_pull_output(Level::High).degrade();
-    let pin_g = pins_0.p0_28.into_push_pull_output(Level::High).degrade();
+    let pin_r = pins_1.p1_08.into_push_pull_output(Level::High).degrade();
+    let pin_b = pins_1.p1_07.into_push_pull_output(Level::High).degrade();
+    let pin_g = pins_1.p1_06.into_push_pull_output(Level::High).degrade();
 
     pwm.set_output_pin(pwm::Channel::C0, pin_r);
     pwm.set_output_pin(pwm::Channel::C1, pin_g);
@@ -54,8 +54,8 @@ fn main() -> ! {
     led.set_color(0, 0, 0);
     periodic_timer.delay_ms(300_u32);
 
-    let scl = pins_0.p0_30.into_floating_input().degrade();
-    let sda = pins_0.p0_31.into_floating_input().degrade();
+    let scl = pins_1.p1_04.into_floating_input().degrade();
+    let sda = pins_1.p1_05.into_floating_input().degrade();
     let twim_pins = twim::Pins { scl, sda };
     let i2c = Twim::new(board.TWIM0, twim_pins, twim::Frequency::K100);
 
