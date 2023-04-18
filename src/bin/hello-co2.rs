@@ -186,7 +186,9 @@ fn format_float_measurement(value: f32, pad_main: u8, precision: u8, unit: &str)
         for _ in 0..(precision - frac_len) {
             frac_text.push_str("0").unwrap();
         }
-        ufmt::uwrite!(frac_text, "{}", frac_part).unwrap();
+        if frac_part > 0 {
+            ufmt::uwrite!(frac_text, "{}", frac_part).unwrap();
+        }
     }
     ufmt::uwrite!(output, "{}{} {}", int_part, frac_text.as_str(), unit).unwrap();
 
