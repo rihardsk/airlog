@@ -139,6 +139,7 @@ fn main() -> ! {
             reading.rel_humidity
         );
 
+        lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
         let co2_text = format_float_measurement(reading.co2, 4, 0, "ppm");
         lcd.write_str(&co2_text, &mut lcd_timer).unwrap();
 
