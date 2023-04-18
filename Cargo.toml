@@ -26,8 +26,9 @@ embedded-hal = "0.2.7"
 nb = "1.1.0"
 crc_all = "0.2.2"
 micromath = "2.0.0"
-lcd1602-rs = "0.1.0"
-void = { version = "1.0.2", default-features = false }
+hd44780-driver = "0.4.0"
+heapless = { version = "0.7.16", features = ["ufmt-impl"] }
+ufmt = "0.2.0"
 
 [dev-dependencies]
 defmt-test = "0.3"
