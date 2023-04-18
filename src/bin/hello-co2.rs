@@ -14,8 +14,7 @@ use micromath::F32Ext;
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, gpio::p1::Parts as P1Parts, Timer};
 
 use airlog::{
-    self as _,
-    logic,
+    self as _, logic,
     peripherals::{scd30, Button, LEDControl, PwmLEDControl, SCD30},
 }; // global logger + panicking-behavior + memory layout
 
@@ -141,20 +140,14 @@ fn main() -> ! {
         );
 
         let mut lcd_text: heapless::String<128> = heapless::String::new();
-        let co2_int = reading.co2.floor() as u32;
+        let co2_int = reading.co2.round() as u32;
         // Do some ghetto padding operations so that the LCD text doesn't jump
         // around all the time. TODO: refactor
         let co2_int_len = u32_len(co2_int);
         for _ in 0..(4 - co2_int_len) {
             lcd_text.push_str(" ").unwrap();
         }
-        let co2_frac = (reading.co2.fract() * 100.) as u32;
-        let mut co2_frac_text: heapless::String<2> = heapless::String::new();
-        if co2_frac < 10 {
-            co2_frac_text.push_str("0").unwrap();
-        }
-        ufmt::uwrite!(co2_frac_text, "{}", co2_frac).unwrap();
-        ufmt::uwrite!(lcd_text, "{}.{} ppm", co2_int, co2_frac_text.as_str()).unwrap();
+        ufmt::uwrite!(lcd_text, "{} ppm", co2_int).unwrap();
         lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
         lcd.write_str(&lcd_text, &mut lcd_timer).unwrap();
 
