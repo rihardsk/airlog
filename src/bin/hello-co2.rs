@@ -139,27 +139,18 @@ fn main() -> ! {
             reading.rel_humidity
         );
 
-        let mut lcd_text: heapless::String<128> = heapless::String::new();
-        let co2_int = reading.co2.round() as u32;
-        // Do some ghetto padding operations so that the LCD text doesn't jump
-        // around all the time. TODO: refactor
-        let co2_int_len = u32_len(co2_int);
-        for _ in 0..(4 - co2_int_len) {
-            lcd_text.push_str(" ").unwrap();
-        }
-        ufmt::uwrite!(lcd_text, "{} ppm", co2_int).unwrap();
-        lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
-        lcd.write_str(&lcd_text, &mut lcd_timer).unwrap();
+        let co2_text = format_float_measurement(reading.co2, 4, 0, "ppm");
+        lcd.write_str(&co2_text, &mut lcd_timer).unwrap();
 
         lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
         // TODO: Can't output °, because it's probably part of unicode, not
         // ascii, See if there's a workaround using the hd44780 font table
-        let temp_text = format_float_measurement(reading.temperature, 2, "C");
+        let temp_text = format_float_measurement(reading.temperature, 2, 2, "C");
         lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
 
         lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
         lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
-        let humidity_text = format_float_measurement(reading.rel_humidity, 2, "%");
+        let humidity_text = format_float_measurement(reading.rel_humidity, 2, 2, "%");
         lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
 
         periodic_timer.delay_ms(5000_u32);
@@ -176,8 +167,8 @@ fn u32_len(num: u32) -> u8 {
     count
 }
 
-// TODO: Works only on positive values
-fn format_float_measurement(value: f32, pad_main: u8, unit: &str) -> heapless::String<16> {
+// TODO: Works only on positive values, precision must be <=4
+fn format_float_measurement(value: f32, pad_main: u8, precision: u8, unit: &str) -> heapless::String<16> {
     let mut output: heapless::String<16> = heapless::String::new();
     let int_part = value.floor() as u32;
 
@@ -185,13 +176,18 @@ fn format_float_measurement(value: f32, pad_main: u8, unit: &str) -> heapless::S
     for _ in 0..(pad_main - int_len) {
         output.push_str(" ").unwrap();
     }
-    let frac_part = (value.fract() * 100.) as u32;
-    let mut frac_text: heapless::String<2> = heapless::String::new();
-    if frac_part < 10 {
-        frac_text.push_str("0").unwrap();
+    let mut frac_text: heapless::String<5> = heapless::String::new();
+    if precision > 0 {
+        frac_text.push_str(".").unwrap();
+        let times = 10_u32.pow(precision as u32);
+        let frac_part = (value.fract() * times as f32) as u32;
+        let frac_len = u32_len(frac_part);
+        for _ in 0..(precision - frac_len) {
+            frac_text.push_str("0").unwrap();
+        }
+        ufmt::uwrite!(frac_text, "{}", frac_part).unwrap();
     }
-    ufmt::uwrite!(frac_text, "{}", frac_part).unwrap();
-    ufmt::uwrite!(output, "{}.{} {}", int_part, frac_text.as_str(), unit).unwrap();
+    ufmt::uwrite!(output, "{}{} {}", int_part, frac_text.as_str(), unit).unwrap();
 
     output
 }
