@@ -16,7 +16,8 @@ use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, gpio::p1::Parts as P
 use airlog::{
     self as _, logic,
     peripherals::{scd30, Button, LEDControl, PwmLEDControl, SCD30},
-}; // global logger + panicking-behavior + memory layout
+};
+use sgp40::Sgp40; // global logger + panicking-behavior + memory layout
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -32,6 +33,7 @@ fn main() -> ! {
     // let lcd_timer = DurationTimer(Timer::one_shot(board.TIMER1));
     // let mut lcd_timer = Timer::one_shot(board.TIMER1);
     let mut lcd_timer = hal::Delay::new(core_peripherals.SYST);
+    let mut sgp40_timer = Timer::one_shot(board.TIMER1);
 
     let pwm = Pwm::new(board.PWM0);
 
@@ -77,6 +79,31 @@ fn main() -> ! {
     }
     periodic_timer.delay_ms(100_u32);
 
+    defmt::info!("Initializing SGP40 VOC sensor");
+    // TODO: share the previous i2c
+    let sda2 = pins_1.p1_02.into_floating_input().degrade();
+    let scl2 = pins_1.p1_03.into_floating_input().degrade();
+    let twim_pins2 = twim::Pins { scl: scl2, sda: sda2 };
+    let i2c2 = Twim::new(board.TWIM1, twim_pins2, twim::Frequency::K100);
+    let mut sgp40 = Sgp40::new(i2c2, 0x59, sgp40_timer);
+
+    defmt::info!("Calibrating SGP40");
+    // Discard the first 45 samples as the algorithm is just warming up.
+    for _ in 1..45 {
+        sgp40.measure_voc_index().unwrap();
+    }
+    // periodic_timer.start(10_000_u32);
+    //
+    // TODO: Something's off here, 1 measurement seems to take longer than 10ms,
+    // but the docs seem to indicate that we should be able to measure faster
+    for i in 0..1000 {
+        let voc_after_calibration = sgp40.measure_voc_index().unwrap();
+        if i % 100 == 0 {
+            defmt::info!("Done calibrating SGP40: VOC idx {=u16}", voc_after_calibration);
+        }
+        // nb::block!(periodic_timer.wait()).unwrap();
+    }
+
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
     let en = pins_1.p1_11.into_push_pull_output(Level::Low);
     let d4 = pins_1.p1_12.into_push_pull_output(Level::Low);
@@ -106,6 +133,7 @@ fn main() -> ! {
     scd30.start_continuous_measurement(1023).unwrap();
     lcd.clear(&mut lcd_timer).unwrap();
 
+    defmt::info!("Entering loop");
     loop {
         // periodic_timer.start(1000_u32);
         loop {
@@ -122,6 +150,11 @@ fn main() -> ! {
         //     led.set_color(255, 0, 0);
         // }
 
+        // TODO: figure out the right measurement approach here. crate docs
+        // indicate that we should be making measurements with 1Hz frequency,
+        // but this also kinda works, must check the datasheet
+        let voc_index = sgp40.measure_voc_index().unwrap();
+
         // current baseline ppm is 424
         let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
         let fraction = fraction.max(0.);
@@ -133,15 +166,22 @@ fn main() -> ! {
             CO2 {=f32} ppm
             Temperature {=f32} °C
             Rel. humidity {=f32} %
+            VOC idx {=u16}
         ",
             reading.co2,
             reading.temperature,
-            reading.rel_humidity
+            reading.rel_humidity,
+            voc_index
         );
 
         lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
         let co2_text = format_float_measurement(reading.co2, 4, 0, "ppm");
         lcd.write_str(&co2_text, &mut lcd_timer).unwrap();
+
+        lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+        // TODO: can we make u32 stuff generic?
+        let voc_text = format_u32_measurement(voc_index as u32, 3, "voc");
+        lcd.write_str(&voc_text, &mut lcd_timer).unwrap();
 
         lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
         // TODO: Can't output °, because it's probably part of unicode, not
@@ -166,6 +206,19 @@ fn u32_len(num: u32) -> u8 {
         count += 1;
     }
     count
+}
+
+// TODO: Works only on positive values, precision must be <=4
+fn format_u32_measurement(value: u32, pad_main: u8, unit: &str) -> heapless::String<16> {
+    let mut output: heapless::String<16> = heapless::String::new();
+
+    let int_len = u32_len(value);
+    for _ in 0..(pad_main - int_len) {
+        output.push_str(" ").unwrap();
+    }
+    ufmt::uwrite!(output, "{} {}", value, unit).unwrap();
+
+    output
 }
 
 // TODO: Works only on positive values, precision must be <=4
