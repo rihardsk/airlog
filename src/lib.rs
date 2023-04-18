@@ -1,8 +1,8 @@
 #![no_main]
 #![no_std]
 
-pub mod peripherals;
 pub mod logic;
+pub mod peripherals;
 
 use defmt_rtt as _; // global logger
 

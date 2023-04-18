@@ -2,11 +2,7 @@
 #![no_std]
 
 use embedded_hal::blocking::delay::DelayMs;
-use nrf52840_hal::{
-    self as hal,
-    gpio::p0::Parts as P0Parts,
-    Timer,
-};
+use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, Timer};
 
 use airlog::{self as _, peripherals::LEDControl}; // global logger + panicking-behavior + memory layout
 

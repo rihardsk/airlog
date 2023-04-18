@@ -1,7 +1,7 @@
 use hal::{
     gpio::{Input, Level, Output, Pin, PullUp, PushPull},
     prelude::{InputPin, OutputPin},
-    pwm::{Instance, Pwm, Channel},
+    pwm::{Channel, Instance, Pwm},
 };
 use nrf52840_hal as hal;
 

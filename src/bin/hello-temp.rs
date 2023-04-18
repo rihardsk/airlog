@@ -2,11 +2,7 @@
 #![no_std]
 
 use embedded_hal::blocking::delay::DelayMs;
-use nrf52840_hal::{
-    self as hal,
-    Temp,
-    Timer,
-};
+use nrf52840_hal::{self as hal, Temp, Timer};
 
 use airlog as _; // global logger + panicking-behavior + memory layout
 
