@@ -169,15 +169,18 @@ fn main() -> ! {
         voc_index = sgp40.measure_voc_index().unwrap();
 
         if seconds % 5 == 0 {
+            let builtin_temperature: f32 = temp.measure().to_num();
             defmt::info!(
             "
                 CO2 {=f32} ppm
                 Temperature {=f32} °C
+                Temp. builtin {=f32} °C
                 Rel. humidity {=f32} %
                 VOC idx {=u16}
             ",
                 reading.co2,
                 reading.temperature,
+                builtin_temperature,
                 reading.rel_humidity,
                 voc_index
             );
@@ -194,7 +197,7 @@ fn main() -> ! {
             lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
             // TODO: Can't output °, because it's probably part of unicode, not
             // ascii, See if there's a workaround using the hd44780 font table
-            let temp_text = format_float_measurement(reading.temperature, 2, 2, "C");
+            let temp_text = format_float_measurement(builtin_temperature, 2, 2, "C");
             lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
 
             lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
