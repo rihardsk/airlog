@@ -29,6 +29,8 @@ fn main() -> ! {
     let pins_1 = P1Parts::new(board.P1);
     let mut temp = Temp::new(board.TEMP);
 
+    let mut builtin_led_1 = pins_0.p0_13.into_push_pull_output(Level::High);
+
     let mut periodic_timer = Timer::periodic(board.TIMER0);
     // let lcd_timer = DurationTimer(Timer::one_shot(board.TIMER1));
     // let mut lcd_timer = Timer::one_shot(board.TIMER1);
@@ -142,6 +144,7 @@ fn main() -> ! {
         temperature: 0.,
     };
     let mut voc_index: u16 = 0;
+    let mut builtin_led_state = hal::prelude::PinState::Low;
     periodic_timer.start(1_000_000_u32);
     loop {
         // periodic_timer.start(1000_u32);
@@ -200,8 +203,18 @@ fn main() -> ! {
             lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
         }
 
+        builtin_led_1.set_state(builtin_led_state);
+        builtin_led_state = toggle_pin_state(builtin_led_state);
+
         nb::block!(periodic_timer.wait()).unwrap();
         seconds = seconds.overflowing_add(1).0;
+    }
+}
+
+fn toggle_pin_state(value: hal::prelude::PinState) -> hal::prelude::PinState {
+    match value {
+        hal::prelude::PinState::Low => hal::prelude::PinState::High,
+        hal::prelude::PinState::High => hal::prelude::PinState::Low,
     }
 }
 
