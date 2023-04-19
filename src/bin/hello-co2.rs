@@ -15,7 +15,7 @@ use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, gpio::p1::Parts as P
 
 use airlog::{
     self as _, logic,
-    peripherals::{scd30, Button, LEDControl, PwmLEDControl, SCD30},
+    peripherals::{scd30, Button, LEDControl, PwmLEDControl, SensorReading, SCD30},
 };
 use sgp40::Sgp40; // global logger + panicking-behavior + memory layout
 
@@ -83,7 +83,10 @@ fn main() -> ! {
     // TODO: share the previous i2c
     let sda2 = pins_1.p1_02.into_floating_input().degrade();
     let scl2 = pins_1.p1_03.into_floating_input().degrade();
-    let twim_pins2 = twim::Pins { scl: scl2, sda: sda2 };
+    let twim_pins2 = twim::Pins {
+        scl: scl2,
+        sda: sda2,
+    };
     let i2c2 = Twim::new(board.TWIM1, twim_pins2, twim::Frequency::K100);
     let mut sgp40 = Sgp40::new(i2c2, 0x59, sgp40_timer);
 
@@ -92,16 +95,14 @@ fn main() -> ! {
     for _ in 1..45 {
         sgp40.measure_voc_index().unwrap();
     }
-    // periodic_timer.start(10_000_u32);
-    //
-    // TODO: Something's off here, 1 measurement seems to take longer than 10ms,
-    // but the docs seem to indicate that we should be able to measure faster
-    for i in 0..1000 {
+    periodic_timer.start(1_000_000_u32);
+    for _ in 0..5 {
         let voc_after_calibration = sgp40.measure_voc_index().unwrap();
-        if i % 100 == 0 {
-            defmt::info!("Done calibrating SGP40: VOC idx {=u16}", voc_after_calibration);
-        }
-        // nb::block!(periodic_timer.wait()).unwrap();
+        defmt::info!(
+            "Done calibrating SGP40: VOC idx {=u16}",
+            voc_after_calibration
+        );
+        nb::block!(periodic_timer.wait()).unwrap();
     }
 
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
@@ -134,67 +135,73 @@ fn main() -> ! {
     lcd.clear(&mut lcd_timer).unwrap();
 
     defmt::info!("Entering loop");
+    let mut seconds: u32 = 0;
+    let mut reading = SensorReading {
+        co2: 0.,
+        rel_humidity: 0.,
+        temperature: 0.,
+    };
+    let mut voc_index: u16 = 0;
+    periodic_timer.start(1_000_000_u32);
     loop {
         // periodic_timer.start(1000_u32);
-        loop {
-            if scd30.data_ready().unwrap() {
-                break;
+        if seconds % 2 == 0 {
+            loop {
+                if scd30.data_ready().unwrap() {
+                    break;
+                }
             }
+            reading = scd30.read_measurement().unwrap();
+
+            // current baseline ppm is 424
+            let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
+            let fraction = fraction.max(0.);
+            let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
+            led.set_color(r, g, b);
         }
-        let reading = scd30.read_measurement().unwrap();
-        // if reading.co2 < 1000_f32 {
-        //     led.set_color(0, 255, 0);
-        // } else if reading.co2 < 1600_f32 {
-        //     led.set_color(255, 255, 0);
-        // } else {
-        //     led.set_color(255, 0, 0);
-        // }
 
         // TODO: figure out the right measurement approach here. crate docs
         // indicate that we should be making measurements with 1Hz frequency,
         // but this also kinda works, must check the datasheet
-        let voc_index = sgp40.measure_voc_index().unwrap();
+        voc_index = sgp40.measure_voc_index().unwrap();
 
-        // current baseline ppm is 424
-        let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
-        let fraction = fraction.max(0.);
-        let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
-        led.set_color(r, g, b);
-
-        defmt::info!(
+        if seconds % 5 == 0 {
+            defmt::info!(
             "
-            CO2 {=f32} ppm
-            Temperature {=f32} °C
-            Rel. humidity {=f32} %
-            VOC idx {=u16}
-        ",
-            reading.co2,
-            reading.temperature,
-            reading.rel_humidity,
-            voc_index
-        );
+                CO2 {=f32} ppm
+                Temperature {=f32} °C
+                Rel. humidity {=f32} %
+                VOC idx {=u16}
+            ",
+                reading.co2,
+                reading.temperature,
+                reading.rel_humidity,
+                voc_index
+            );
 
-        lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
-        let co2_text = format_float_measurement(reading.co2, 4, 0, "ppm");
-        lcd.write_str(&co2_text, &mut lcd_timer).unwrap();
+            lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
+            let co2_text = format_float_measurement(reading.co2, 4, 0, "ppm");
+            lcd.write_str(&co2_text, &mut lcd_timer).unwrap();
 
-        lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
-        // TODO: can we make u32 stuff generic?
-        let voc_text = format_u32_measurement(voc_index as u32, 3, "voc");
-        lcd.write_str(&voc_text, &mut lcd_timer).unwrap();
+            lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+            // TODO: can we make u32 stuff generic?
+            let voc_text = format_u32_measurement(voc_index as u32, 3, "voc");
+            lcd.write_str(&voc_text, &mut lcd_timer).unwrap();
 
-        lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
-        // TODO: Can't output °, because it's probably part of unicode, not
-        // ascii, See if there's a workaround using the hd44780 font table
-        let temp_text = format_float_measurement(reading.temperature, 2, 2, "C");
-        lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
+            lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
+            // TODO: Can't output °, because it's probably part of unicode, not
+            // ascii, See if there's a workaround using the hd44780 font table
+            let temp_text = format_float_measurement(reading.temperature, 2, 2, "C");
+            lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
 
-        lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
-        lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
-        let humidity_text = format_float_measurement(reading.rel_humidity, 2, 2, "%");
-        lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
+            lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+            lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+            let humidity_text = format_float_measurement(reading.rel_humidity, 2, 2, "%");
+            lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
+        }
 
-        periodic_timer.delay_ms(5000_u32);
+        nb::block!(periodic_timer.wait()).unwrap();
+        seconds = seconds.overflowing_add(1).0;
     }
 }
 
@@ -222,7 +229,12 @@ fn format_u32_measurement(value: u32, pad_main: u8, unit: &str) -> heapless::Str
 }
 
 // TODO: Works only on positive values, precision must be <=4
-fn format_float_measurement(value: f32, pad_main: u8, precision: u8, unit: &str) -> heapless::String<16> {
+fn format_float_measurement(
+    value: f32,
+    pad_main: u8,
+    precision: u8,
+    unit: &str,
+) -> heapless::String<16> {
     let mut output: heapless::String<16> = heapless::String::new();
     let int_part = value.floor() as u32;
 
