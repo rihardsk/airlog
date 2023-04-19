@@ -148,7 +148,7 @@ fn main() -> ! {
     periodic_timer.start(1_000_000_u32);
     loop {
         // periodic_timer.start(1000_u32);
-        if seconds % 2 == 0 {
+        if seconds % 3 == 0 {
             loop {
                 if scd30.data_ready().unwrap() {
                     break;
