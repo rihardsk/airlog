@@ -35,7 +35,7 @@ fn main() -> ! {
     // let lcd_timer = DurationTimer(Timer::one_shot(board.TIMER1));
     // let mut lcd_timer = Timer::one_shot(board.TIMER1);
     let mut lcd_timer = hal::Delay::new(core_peripherals.SYST);
-    let mut sgp40_timer = Timer::one_shot(board.TIMER1);
+    let sgp40_timer = Timer::one_shot(board.TIMER1);
 
     let pwm = Pwm::new(board.PWM0);
 
@@ -143,7 +143,7 @@ fn main() -> ! {
         rel_humidity: 0.,
         temperature: 0.,
     };
-    let mut voc_index: u16 = 0;
+    let mut voc_index: u16;
     let mut builtin_led_state = hal::prelude::PinState::Low;
     periodic_timer.start(1_000_000_u32);
     loop {
@@ -203,7 +203,7 @@ fn main() -> ! {
             lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
         }
 
-        builtin_led_1.set_state(builtin_led_state);
+        builtin_led_1.set_state(builtin_led_state).unwrap();
         builtin_led_state = toggle_pin_state(builtin_led_state);
 
         nb::block!(periodic_timer.wait()).unwrap();
