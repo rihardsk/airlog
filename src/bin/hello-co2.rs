@@ -95,20 +95,22 @@ fn main() -> ! {
     let i2c2 = Twim::new(board.TWIM1, twim_pins2, twim::Frequency::K100);
     let mut sgp40 = Sgp40::new(i2c2, 0x59, sgp40_timer);
 
-    defmt::info!("Calibrating SGP40");
-    // Discard the first 45 samples as the algorithm is just warming up.
-    for _ in 1..45 {
-        sgp40.measure_voc_index().unwrap();
+    defmt::info!("Calibrating SGP40 for 10s");
+    let mut voc_after_calibration;
+    // Warm up the VOC sensor for 10s
+    periodic_timer.start(10_000_000_u32);
+    loop {
+        voc_after_calibration = sgp40.measure_voc_index().unwrap();
+        match periodic_timer.wait() {
+            Ok(_) => break,
+            Err(nb::Error::WouldBlock) => {},
+            Err(nb::Error::Other(_)) => panic!(),
+        }
     }
-    periodic_timer.start(1_000_000_u32);
-    for _ in 0..5 {
-        let voc_after_calibration = sgp40.measure_voc_index().unwrap();
-        defmt::info!(
-            "Done calibrating SGP40: VOC idx {=u16}",
-            voc_after_calibration
-        );
-        nb::block!(periodic_timer.wait()).unwrap();
-    }
+    defmt::info!(
+        "Done calibrating SGP40: VOC idx {=u16}",
+        voc_after_calibration
+    );
 
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
     let en = pins_1.p1_11.into_push_pull_output(Level::Low);
