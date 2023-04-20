@@ -1,0 +1,99 @@
+use embedded_hal::blocking::delay::DelayMs;
+use crc_all::Crc;
+use nrf52840_hal::{
+    twim::{Error, Instance},
+    Twim,
+};
+
+// pub struct FirmwareVersion {
+//     pub major: u8,
+//     pub minor: u8,
+// }
+
+pub struct SGP40<T: Instance>(Twim<T>);
+
+static DEFAULT_ADDRESS: u8 = 0x59;
+static DEFAULT_MEASUREMENT_COMMAND: [u8; 8] = [0x26, 0x0f, 0x80, 0x00, 0xa2, 0x66, 0x66, 0x93];
+
+pub struct SensorReading {
+    pub voc_index: f32,
+    pub voc_raw: f32,
+}
+
+impl<T> SGP40<T>
+where
+    T: Instance,
+{
+    pub fn new(i2c2: Twim<T>) -> Self {
+        SGP40(i2c2)
+    }
+
+    // TODO: there's a serial number not a firmware version available only
+    // pub fn get_firmware_version(&mut self) -> Result<FirmwareVersion, Error> {
+    // }
+
+    pub fn measure_raw_signal_compensated(&mut self, temperature: i16, humidity: u8, delay: &impl DelayMs<u8>) {
+        todo!()
+    }
+}
+
+fn create_measurement_command(temperature: i16, humidity: u8) -> [u8; 8] {
+    let mut command: [u8; 8] = [0x26, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    let humidity_bytes = humidity_to_ticks(humidity).to_be_bytes();
+    command[2] = humidity_bytes[0];
+    command[3] = humidity_bytes[1];
+
+    let mut crc = Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
+    crc.update(&humidity_bytes);
+    command[4] = crc.finish();
+
+    let temp_bytes = temperature_to_ticks(temperature).to_be_bytes();
+    command[5] = temp_bytes[0];
+    command[6] = temp_bytes[1];
+
+    let mut crc = Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
+    crc.update(&temp_bytes);
+    command[7] = crc.finish();
+
+    command
+}
+
+/// Value must be in range [-45; 130]
+fn temperature_to_ticks(value: i16) -> u16 {
+    let (quot, rem) = div_rem((value + 45) as u32 * 65535, 175);
+    // Use <= here, because 175 / 2 get's rounded down
+    if rem <= 175 / 2 {
+        quot as u16
+    } else {
+        (quot + 1) as u16
+    }
+}
+
+/// Value must be in range [0; 100]
+fn humidity_to_ticks(value: u8) -> u16 {
+    let (quot, rem) = div_rem(value as u32 * 65535, 100);
+    if rem < 100 / 2 {
+        quot as u16
+    } else {
+        (quot + 1) as u16
+    }
+}
+
+// There's hope that rustc can optimize this into a sinlge instruction, at least on some plaforms
+fn div_rem(x: u32, y: u32) -> (u32, u32) {
+    let quot = x / y;
+    let rem = x % y;
+    (quot, rem)
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::{create_measurement_command, DEFAULT_MEASUREMENT_COMMAND};
+
+    // Defmt isn't too good at tests curently
+    // #[test]
+    pub fn generate_command() {
+        let generated_command = create_measurement_command(25, 50);
+        assert_eq!(generated_command, DEFAULT_MEASUREMENT_COMMAND);
+    }
+}

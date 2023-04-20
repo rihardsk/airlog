@@ -33,9 +33,15 @@ pub fn exit() -> ! {
 #[defmt_test::tests]
 mod unit_tests {
     use defmt::assert;
+    use super::peripherals::sgp40::tests as sgp40_tests;
 
     #[test]
     fn it_works() {
         assert!(true)
+    }
+
+    #[test]
+    fn generate_command() {
+        sgp40_tests::generate_command();
     }
 }
