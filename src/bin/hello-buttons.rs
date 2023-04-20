@@ -7,7 +7,7 @@ use nrf52840_hal::{
     gpio::{p0::Parts as P0Parts, Level},
 };
 
-use airlog::{self as _, peripherals::Button}; // global logger + panicking-behavior + memory layout
+use airlog::{self as _, peripherals::button::Button}; // global logger + panicking-behavior + memory layout
 
 #[cortex_m_rt::entry]
 fn main() -> ! {

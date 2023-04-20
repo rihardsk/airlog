@@ -5,7 +5,7 @@ use cortex_m::prelude::_embedded_hal_timer_CountDown;
 use hal::Temp;
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, Timer};
 
-use airlog::{self as _, peripherals::Button}; // global logger + panicking-behavior + memory layout
+use airlog::{self as _, peripherals::button::Button}; // global logger + panicking-behavior + memory layout
 
 #[derive(defmt::Format)]
 enum TempUnit {

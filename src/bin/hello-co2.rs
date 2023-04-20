@@ -15,7 +15,10 @@ use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, gpio::p1::Parts as P
 
 use airlog::{
     self as _, logic,
-    peripherals::{scd30, Button, LEDControl, PwmLEDControl, SensorReading, SCD30},
+    peripherals::{
+        led::{LEDControl, PwmLEDControl},
+        scd30::{SensorReading, SCD30},
+    },
 };
 use sgp40::Sgp40; // global logger + panicking-behavior + memory layout
 
@@ -171,7 +174,7 @@ fn main() -> ! {
         if seconds % 5 == 0 {
             let builtin_temperature: f32 = temp.measure().to_num();
             defmt::info!(
-            "
+                "
                 CO2 {=f32} ppm
                 Temperature {=f32} °C
                 Temp. builtin {=f32} °C
