@@ -141,11 +141,12 @@ fn main() -> ! {
     let mut seconds: u32 = 0;
     let mut reading = SensorReading {
         co2: 0.,
-        rel_humidity: 0.,
-        temperature: 0.,
+        rel_humidity: 50.,
+        temperature: 25.,
     };
     let mut voc_index: u16;
     let mut builtin_led_state = hal::prelude::PinState::Low;
+    let mut builtin_temperature: f32 = 25.;
     periodic_timer.start(1_000_000_u32);
     loop {
         // periodic_timer.start(1000_u32);
@@ -164,13 +165,17 @@ fn main() -> ! {
             led.set_color(r, g, b);
         }
 
-        // TODO feed in temp and humidity values
+        if seconds % 5 == 0 {
+            builtin_temperature = temp.measure().to_num();
+        }
+
+        let voc_temp = builtin_temperature.round() as i16;
+        let voc_humidity = reading.rel_humidity.round() as u8;
         voc_index = sgp40
-            .measure_signal_compensated(25, 50, &mut sgp40_timer)
+            .measure_signal_compensated(voc_temp, voc_humidity, &mut sgp40_timer)
             .unwrap();
 
         if seconds % 5 == 0 {
-            let builtin_temperature: f32 = temp.measure().to_num();
             defmt::info!(
                 "
                 CO2 {=f32} ppm
