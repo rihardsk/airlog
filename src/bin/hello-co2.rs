@@ -75,6 +75,17 @@ fn main() -> ! {
         version.major,
         version.minor
     );
+    let desired_offset: f32 = 3.72;
+    let temperature_offset = scd30.read_temperature_offset().unwrap();
+    defmt::info!(
+        "SCD30 – current temp. offset: {=f32}, desired offset: {=f32}",
+        temperature_offset,
+        desired_offset
+    );
+    if temperature_offset != desired_offset {
+        defmt::info!("SCD30 – setting temp. offset to {=f32}", desired_offset);
+        scd30.set_temperature_offset(desired_offset).unwrap();
+    }
 
     for i in 0..=100 {
         let fraction = i as f32 / 100.;
@@ -165,12 +176,14 @@ fn main() -> ! {
                 CO2 {=f32} ppm
                 Temperature {=f32} °C
                 Temp. builtin {=f32} °C
+                Temp. diff {=f32} °C
                 Rel. humidity {=f32} %
                 VOC idx {=u16}
             ",
                 reading.co2,
                 reading.temperature,
                 builtin_temperature,
+                reading.temperature - builtin_temperature,
                 reading.rel_humidity,
                 voc_index
             );

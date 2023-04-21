@@ -1,4 +1,5 @@
 use crc_all::Crc;
+use micromath::F32Ext;
 use nrf52840_hal::{
     twim::{Error, Instance},
     Twim,
@@ -85,5 +86,33 @@ where
             temperature,
             rel_humidity,
         })
+    }
+
+    pub fn set_temperature_offset(&mut self, offset: f32) -> Result<(), Error> {
+        let mut command: [u8; 5] = [0x54, 0x03, 0x00, 0x00, 0x00];
+        let ticks = (offset * 100.).round() as u16;
+        let ticks_bytes = ticks.to_be_bytes();
+        command[2] = ticks_bytes[0];
+        command[3] = ticks_bytes[1];
+
+        let mut crc = Crc::<u8>::new(0x31, 8, 0xff, 0x00, false);
+        crc.update(&ticks_bytes);
+        command[4] = crc.finish();
+
+        self.0.write(DEFAULT_ADDRESS, &command)?;
+
+        Ok(())
+    }
+
+    pub fn read_temperature_offset(&mut self) -> Result<f32, Error> {
+        let command: [u8; 2] = [0x54, 0x03];
+        self.0.write(DEFAULT_ADDRESS, &command)?;
+        let mut buf = [0; 3];
+        self.0.read(DEFAULT_ADDRESS, &mut buf)?;
+
+        let offset_ticks = u16::from_be_bytes([buf[0], buf[1]]);
+        let temperature_offset = offset_ticks as f32 / 100.;
+
+        Ok(temperature_offset)
     }
 }
