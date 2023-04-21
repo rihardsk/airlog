@@ -18,9 +18,9 @@ use airlog::{
     peripherals::{
         led::{LEDControl, PwmLEDControl},
         scd30::{SensorReading, SCD30},
+        sgp40::SGP40,
     },
 };
-use sgp40::Sgp40; // global logger + panicking-behavior + memory layout
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -38,7 +38,7 @@ fn main() -> ! {
     // let lcd_timer = DurationTimer(Timer::one_shot(board.TIMER1));
     // let mut lcd_timer = Timer::one_shot(board.TIMER1);
     let mut lcd_timer = hal::Delay::new(core_peripherals.SYST);
-    let sgp40_timer = Timer::one_shot(board.TIMER1);
+    let mut sgp40_timer = Timer::one_shot(board.TIMER1);
 
     let pwm = Pwm::new(board.PWM0);
 
@@ -93,24 +93,9 @@ fn main() -> ! {
         sda: sda2,
     };
     let i2c2 = Twim::new(board.TWIM1, twim_pins2, twim::Frequency::K100);
-    let mut sgp40 = Sgp40::new(i2c2, 0x59, sgp40_timer);
-
-    defmt::info!("Calibrating SGP40 for 10s");
-    let mut voc_after_calibration;
-    // Warm up the VOC sensor for 10s
-    periodic_timer.start(10_000_000_u32);
-    loop {
-        voc_after_calibration = sgp40.measure_voc_index().unwrap();
-        match periodic_timer.wait() {
-            Ok(_) => break,
-            Err(nb::Error::WouldBlock) => {},
-            Err(nb::Error::Other(_)) => panic!(),
-        }
-    }
-    defmt::info!(
-        "Done calibrating SGP40: VOC idx {=u16}",
-        voc_after_calibration
-    );
+    // NOTE: don't forget that there must be atleast 0.6ms of delay before
+    // making the first measurement
+    let mut sgp40 = SGP40::new(i2c2, 1.);
 
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
     let en = pins_1.p1_11.into_push_pull_output(Level::Low);
@@ -168,10 +153,10 @@ fn main() -> ! {
             led.set_color(r, g, b);
         }
 
-        // TODO: figure out the right measurement approach here. crate docs
-        // indicate that we should be making measurements with 1Hz frequency,
-        // but this also kinda works, must check the datasheet
-        voc_index = sgp40.measure_voc_index().unwrap();
+        // TODO feed in temp and humidity values
+        voc_index = sgp40
+            .measure_signal_compensated(25, 50, &mut sgp40_timer)
+            .unwrap();
 
         if seconds % 5 == 0 {
             let builtin_temperature: f32 = temp.measure().to_num();
@@ -236,12 +221,13 @@ fn u32_len(num: u32) -> u8 {
     count
 }
 
+// TODO: fix output when value is 0
 // TODO: Works only on positive values, precision must be <=4
 fn format_u32_measurement(value: u32, pad_main: u8, unit: &str) -> heapless::String<16> {
     let mut output: heapless::String<16> = heapless::String::new();
 
     let int_len = u32_len(value);
-    for _ in 0..(pad_main - int_len) {
+    for _ in 0..(pad_main - int_len.min(pad_main)) {
         output.push_str(" ").unwrap();
     }
     ufmt::uwrite!(output, "{} {}", value, unit).unwrap();
@@ -260,7 +246,7 @@ fn format_float_measurement(
     let int_part = value.floor() as u32;
 
     let int_len = u32_len(int_part);
-    for _ in 0..(pad_main - int_len) {
+    for _ in 0..(pad_main - int_len.min(pad_main)) {
         output.push_str(" ").unwrap();
     }
     let mut frac_text: heapless::String<5> = heapless::String::new();

@@ -1,5 +1,6 @@
-use embedded_hal::blocking::delay::DelayMs;
 use crc_all::Crc;
+use embedded_hal::blocking::delay::DelayMs;
+use gas_index_algorithm::{AlgorithmType, GasIndexAlgorithm};
 use nrf52840_hal::{
     twim::{Error, Instance},
     Twim,
@@ -10,7 +11,10 @@ use nrf52840_hal::{
 //     pub minor: u8,
 // }
 
-pub struct SGP40<T: Instance>(Twim<T>);
+pub struct SGP40<T: Instance> {
+    i2c: Twim<T>,
+    algo: GasIndexAlgorithm,
+}
 
 static DEFAULT_ADDRESS: u8 = 0x59;
 static DEFAULT_MEASUREMENT_COMMAND: [u8; 8] = [0x26, 0x0f, 0x80, 0x00, 0xa2, 0x66, 0x66, 0x93];
@@ -24,16 +28,40 @@ impl<T> SGP40<T>
 where
     T: Instance,
 {
-    pub fn new(i2c2: Twim<T>) -> Self {
-        SGP40(i2c2)
+    /// NOTE: The sensor is ready to receive commands from the i2c master 0.6ms
+    /// after powering on (after reaching voltage of 1.7V).
+    pub fn new(i2c: Twim<T>, sampling_interval_s: f32) -> Self {
+        let algo = GasIndexAlgorithm::new(AlgorithmType::Voc, sampling_interval_s);
+        SGP40 { i2c, algo }
     }
 
     // TODO: there's a serial number not a firmware version available only
     // pub fn get_firmware_version(&mut self) -> Result<FirmwareVersion, Error> {
     // }
 
-    pub fn measure_raw_signal_compensated(&mut self, temperature: i16, humidity: u8, delay: &impl DelayMs<u8>) {
-        todo!()
+    pub fn measure_raw_signal_compensated(
+        &mut self,
+        temperature: i16,
+        humidity: u8,
+        delay: &mut impl DelayMs<u8>,
+    ) -> Result<u16, Error> {
+        let command = create_measurement_command(temperature, humidity);
+        self.i2c.write(DEFAULT_ADDRESS, &command)?;
+        delay.delay_ms(30);
+        let mut buf = [0; 3];
+        self.i2c.read(DEFAULT_ADDRESS, &mut buf)?;
+        let sraw_voc = u16::from_be_bytes([buf[0], buf[1]]);
+        Ok(sraw_voc)
+    }
+
+    pub fn measure_signal_compensated(&mut self,
+        temperature: i16,
+        humidity: u8,
+        delay: &mut impl DelayMs<u8>,
+    ) -> Result<u16, Error> {
+        let sraw_voc = self.measure_raw_signal_compensated(temperature, humidity, delay)?;
+        let voc_idx = self.algo.process(sraw_voc as i32);
+        Ok(voc_idx as u16)
     }
 }
 
