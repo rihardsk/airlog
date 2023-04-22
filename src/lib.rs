@@ -100,4 +100,9 @@ mod unit_tests {
     fn format_float_more_digits() {
         formatting_tests::format_float_more_digits();
     }
+
+    #[test]
+    fn format_float_carry_over() {
+        formatting_tests::format_float_carry_over();
+    }
 }

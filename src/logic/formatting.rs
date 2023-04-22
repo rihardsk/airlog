@@ -34,24 +34,34 @@ pub fn format_float_measurement(
     precision: u8,
     unit: &str,
 ) -> heapless::String<16> {
-    let mut output: heapless::String<16> = heapless::String::new();
-    let int_part = value.floor() as u32;
-
-    let int_len = u32_len(int_part);
-    for _ in 0..(pad_main - int_len.min(pad_main)) {
-        output.push_str(" ").unwrap();
-    }
+    let mut carry_over = false;
     let mut frac_text: heapless::String<5> = heapless::String::new();
     if precision > 0 {
         frac_text.push_str(".").unwrap();
         let times = 10_u32.pow(precision as u32);
-        let frac_part = (value.fract() * times as f32).round() as u32;
+        let mut frac_part = (value.fract() * times as f32).round() as u32;
+        if frac_part >= times {
+            carry_over = true;
+            frac_part = 0;
+        }
         let frac_len = u32_len(frac_part);
         // defmt::info!("fract: {=f32}, frac_part {=u32}, frac_len {=u8}", value.fract(), frac_part, frac_len);
         for _ in 0..(precision - frac_len) {
             frac_text.push_str("0").unwrap();
         }
         ufmt::uwrite!(frac_text, "{}", frac_part).unwrap();
+    }
+
+    let mut output: heapless::String<16> = heapless::String::new();
+
+    let int_part = if carry_over {
+        value.floor() as u32 + 1
+    } else {
+        value.floor() as u32
+    };
+    let int_len = u32_len(int_part);
+    for _ in 0..(pad_main - int_len.min(pad_main)) {
+        output.push_str(" ").unwrap();
     }
     ufmt::uwrite!(output, "{}{} {}", int_part, frac_text.as_str(), unit).unwrap();
 
@@ -116,5 +126,10 @@ pub mod tests {
     pub fn format_float_more_digits() {
         let res = format_float_measurement(123.125, 2, 2, "°C");
         assert_eq!(res.as_str(), "123.13 °C");
+    }
+
+    pub fn format_float_carry_over() {
+        let res = format_float_measurement(0.999, 2, 2, "°C");
+        assert_eq!(res.as_str(), " 1.00 °C");
     }
 }
