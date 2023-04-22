@@ -34,6 +34,7 @@ pub fn exit() -> ! {
 mod unit_tests {
     use defmt::assert;
     use super::peripherals::sgp40::tests as sgp40_tests;
+    use super::logic::formatting::tests as formatting_tests;
 
     #[test]
     fn it_works() {
@@ -43,5 +44,60 @@ mod unit_tests {
     #[test]
     fn generate_command() {
         sgp40_tests::generate_command();
+    }
+
+    #[test]
+    fn format_zero() {
+        formatting_tests::format_zero();
+    }
+
+    #[test]
+    fn format_ten() {
+        formatting_tests::format_ten();
+    }
+
+    #[test]
+    fn format_single_digit() {
+        formatting_tests::format_single_digit();
+    }
+
+    #[test]
+    fn format_all_digits() {
+        formatting_tests::format_all_digits();
+    }
+
+    #[test]
+    fn format_more_digits() {
+        formatting_tests::format_more_digits();
+    }
+
+    #[test]
+    fn format_dont_pad() {
+        formatting_tests::format_dont_pad();
+    }
+
+    #[test]
+    fn format_float_zero() {
+        formatting_tests::format_float_zero();
+    }
+
+    #[test]
+    fn format_float_small_fract() {
+        formatting_tests::format_float_small_fract();
+    }
+
+    #[test]
+    fn format_float_smaller_fract() {
+        formatting_tests::format_float_smaller_fract();
+    }
+
+    #[test]
+    fn format_float_single_digit() {
+        formatting_tests::format_float_single_digit();
+    }
+
+    #[test]
+    fn format_float_more_digits() {
+        formatting_tests::format_float_more_digits();
     }
 }
