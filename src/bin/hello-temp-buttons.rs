@@ -41,7 +41,7 @@ fn main() -> ! {
     let mut temp = Temp::new(board.TEMP);
 
     let mut current_unit = TempUnit::Celsius;
-    let mut button = Button::new(pins.p0_11.degrade());
+    let mut button = Button::new(pins.p0_11.into_floating_input());
     let mut periodic_timer = Timer::periodic(board.TIMER0);
     let mut millis: u32 = 0;
 

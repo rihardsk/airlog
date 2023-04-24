@@ -1,11 +1,8 @@
 use crc_all::Crc;
+use embedded_hal::blocking::i2c;
 use micromath::F32Ext;
-use nrf52840_hal::{
-    twim::{Error, Instance},
-    Twim,
-};
 
-pub struct SCD30<T: Instance>(Twim<T>);
+pub struct SCD30<T>(T);
 
 static DEFAULT_ADDRESS: u8 = 0x61;
 
@@ -22,15 +19,16 @@ pub struct SensorReading {
 
 impl<T> SCD30<T>
 where
-    T: Instance,
+    T: i2c::Write,
+    T: i2c::Read<Error = <T as i2c::Write>::Error>,
 {
     // TODO: scd30 interface description mentions something about i2c clock
     // stretching and that we need to support it. find out what that is
-    pub fn new(i2c2: Twim<T>) -> Self {
+    pub fn new(i2c2: T) -> Self {
         SCD30(i2c2)
     }
 
-    pub fn get_firmware_version(&mut self) -> Result<FirmwareVersion, Error> {
+    pub fn get_firmware_version(&mut self) -> Result<FirmwareVersion, <T as i2c::Write>::Error> {
         let command: [u8; 2] = [0xd1, 0x00];
         // Interesting, if we inline the command array, we get a
         // DMABufferNotInDataMemory error. Seems like the command must be in
@@ -46,7 +44,10 @@ where
         Ok(FirmwareVersion { major, minor })
     }
 
-    pub fn start_continuous_measurement(&mut self, pressure: u16) -> Result<(), Error> {
+    pub fn start_continuous_measurement(
+        &mut self,
+        pressure: u16,
+    ) -> Result<(), <T as i2c::Write>::Error> {
         let mut command: [u8; 5] = [0x00, 0x10, 0x00, 0x00, 0x00];
         let pressure_bytes = pressure.to_be_bytes();
         command[2] = pressure_bytes[0];
@@ -61,7 +62,7 @@ where
         Ok(())
     }
 
-    pub fn data_ready(&mut self) -> Result<bool, Error> {
+    pub fn data_ready(&mut self) -> Result<bool, <T as i2c::Write>::Error> {
         let command: [u8; 2] = [0x02, 0x02];
         self.0.write(DEFAULT_ADDRESS, &command)?;
         let mut buf = [0; 3];
@@ -71,7 +72,7 @@ where
         Ok(u16::from_be_bytes([buf[0], buf[1]]) == 1)
     }
 
-    pub fn read_measurement(&mut self) -> Result<SensorReading, Error> {
+    pub fn read_measurement(&mut self) -> Result<SensorReading, <T as i2c::Write>::Error> {
         let command: [u8; 2] = [0x03, 0x00];
         self.0.write(DEFAULT_ADDRESS, &command)?;
         let mut buf = [0; 18];
@@ -88,7 +89,7 @@ where
         })
     }
 
-    pub fn set_temperature_offset(&mut self, offset: f32) -> Result<(), Error> {
+    pub fn set_temperature_offset(&mut self, offset: f32) -> Result<(), <T as i2c::Write>::Error> {
         let mut command: [u8; 5] = [0x54, 0x03, 0x00, 0x00, 0x00];
         let ticks = (offset * 100.).round() as u16;
         let ticks_bytes = ticks.to_be_bytes();
@@ -104,7 +105,7 @@ where
         Ok(())
     }
 
-    pub fn read_temperature_offset(&mut self) -> Result<f32, Error> {
+    pub fn read_temperature_offset(&mut self) -> Result<f32, <T as i2c::Write>::Error> {
         let command: [u8; 2] = [0x54, 0x03];
         self.0.write(DEFAULT_ADDRESS, &command)?;
         let mut buf = [0; 3];

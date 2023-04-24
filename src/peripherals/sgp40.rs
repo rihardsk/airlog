@@ -1,18 +1,14 @@
 use crc_all::Crc;
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::blocking::{delay::DelayMs, i2c};
 use gas_index_algorithm::{AlgorithmType, GasIndexAlgorithm};
-use nrf52840_hal::{
-    twim::{Error, Instance},
-    Twim,
-};
 
 // pub struct FirmwareVersion {
 //     pub major: u8,
 //     pub minor: u8,
 // }
 
-pub struct SGP40<T: Instance> {
-    i2c: Twim<T>,
+pub struct SGP40<T> {
+    i2c: T,
     algo: GasIndexAlgorithm,
 }
 
@@ -26,11 +22,12 @@ pub struct SensorReading {
 
 impl<T> SGP40<T>
 where
-    T: Instance,
+    T: i2c::Write,
+    T: i2c::Read<Error = <T as i2c::Write>::Error>,
 {
     /// NOTE: The sensor is ready to receive commands from the i2c master 0.6ms
     /// after powering on (after reaching voltage of 1.7V).
-    pub fn new(i2c: Twim<T>, sampling_interval_s: f32) -> Self {
+    pub fn new(i2c: T, sampling_interval_s: f32) -> Self {
         let algo = GasIndexAlgorithm::new(AlgorithmType::Voc, sampling_interval_s);
         SGP40 { i2c, algo }
     }
@@ -44,7 +41,7 @@ where
         temperature: i16,
         humidity: u8,
         delay: &mut impl DelayMs<u8>,
-    ) -> Result<u16, Error> {
+    ) -> Result<u16, <T as i2c::Write>::Error> {
         let command = create_measurement_command(temperature, humidity);
         self.i2c.write(DEFAULT_ADDRESS, &command)?;
         delay.delay_ms(30);
@@ -54,11 +51,12 @@ where
         Ok(sraw_voc)
     }
 
-    pub fn measure_signal_compensated(&mut self,
+    pub fn measure_signal_compensated(
+        &mut self,
         temperature: i16,
         humidity: u8,
         delay: &mut impl DelayMs<u8>,
-    ) -> Result<u16, Error> {
+    ) -> Result<u16, <T as i2c::Write>::Error> {
         let sraw_voc = self.measure_raw_signal_compensated(temperature, humidity, delay)?;
         let voc_idx = self.algo.process(sraw_voc as i32);
         Ok(voc_idx as u16)

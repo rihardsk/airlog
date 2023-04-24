@@ -1,18 +1,21 @@
-use hal::{
-    gpio::{Input, Level, Output, Pin, PullUp, PushPull},
-    prelude::{InputPin, OutputPin},
-};
-use nrf52840_hal as hal;
+use embedded_hal::digital::v2::InputPin;
 
-pub struct Button {
-    pin: Pin<Input<PullUp>>,
+pub struct Button<P> {
+    pin: P,
     was_pressed: bool,
 }
 
-impl Button {
-    pub fn new<Mode>(pin: Pin<Mode>) -> Self {
+impl<P> Button<P>
+where
+    P: InputPin,
+    // This is somehow needed for .unwrap()
+    P::Error: core::fmt::Debug,
+{
+    // TODO: check that callers do an into_pullup?
+    // what is pullup really?
+    pub fn new(pin: P) -> Self {
         Button {
-            pin: pin.into_pullup_input(),
+            pin,
             was_pressed: false,
         }
     }

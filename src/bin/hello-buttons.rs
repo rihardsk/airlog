@@ -17,7 +17,7 @@ fn main() -> ! {
     // let mut timer = Timer::new(board.TIMER0);
     let pins = P0Parts::new(board.P0);
 
-    let button = Button::new(pins.p0_11.degrade());
+    let button = Button::new(pins.p0_11.into_floating_input());
     let mut led_1 = pins.p0_13.into_push_pull_output(Level::High);
 
     loop {
