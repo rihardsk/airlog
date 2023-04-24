@@ -1,48 +1,65 @@
-use hal::{
-    gpio::{Input, Level, Output, Pin, PullUp, PushPull},
-    prelude::{InputPin, OutputPin},
-    pwm::{Channel, Instance, Pwm},
-};
-use nrf52840_hal as hal;
+use crate::future::pwm::SetDutyCycle;
+use embedded_hal::digital::v2::OutputPin;
 
-pub struct PwmLEDControl<T: Instance> {
-    pwm: Pwm<T>,
+pub struct PwmLEDControl<T> {
+    channel_red: T,
+    channel_green: T,
+    channel_blue: T,
 }
 
 impl<T> PwmLEDControl<T>
 where
-    T: Instance,
+    T: SetDutyCycle,
 {
     // TODO: take individual channels
-    pub fn new(pwm: Pwm<T>) -> Self {
-        pwm.set_max_duty(255);
-        PwmLEDControl { pwm }
+    pub fn new(red: T, green: T, blue: T) -> Self {
+        PwmLEDControl {
+            channel_red: red,
+            channel_blue: blue,
+            channel_green: green,
+        }
     }
 
     pub fn set_color(&mut self, red: u8, green: u8, blue: u8) {
-        self.pwm.set_duty_on(Channel::C0, red as u16);
-        self.pwm.set_duty_on(Channel::C1, green as u16);
-        self.pwm.set_duty_on(Channel::C2, blue as u16);
+        self.channel_red
+            .set_duty_cycle_fraction(red as u16, 255_u16)
+            .unwrap();
+        self.channel_green
+            .set_duty_cycle_fraction(green as u16, 255_u16)
+            .unwrap();
+        self.channel_blue
+            .set_duty_cycle_fraction(blue as u16, 255_u16)
+            .unwrap();
     }
 
-    pub fn free(self) -> Pwm<T> {
-        self.pwm
+    pub fn free(self) -> (T, T, T) {
+        (self.channel_red, self.channel_green, self.channel_blue)
     }
 }
 
-pub struct LEDControl {
-    r: Pin<Output<PushPull>>,
-    g: Pin<Output<PushPull>>,
-    b: Pin<Output<PushPull>>,
+pub struct LEDControl<T> {
+    r: T,
+    g: T,
+    b: T,
 }
 
-impl LEDControl {
-    pub fn new<Mode>(led_red: Pin<Mode>, led_green: Pin<Mode>, led_blue: Pin<Mode>) -> Self {
-        LEDControl {
-            r: led_red.into_push_pull_output(Level::High),
-            g: led_green.into_push_pull_output(Level::High),
-            b: led_blue.into_push_pull_output(Level::High),
-        }
+impl<T> LEDControl<T>
+where
+    T: OutputPin,
+    T::Error: core::fmt::Debug,
+{
+    pub fn new(led_red: T, led_green: T, led_blue: T) -> Self {
+        let mut led = LEDControl {
+            r: led_red,
+            g: led_green,
+            b: led_blue,
+        };
+        // TODO should probably pass configuration whether the leds are active
+        // high or active low
+        led.r.set_high().unwrap();
+        led.g.set_high().unwrap();
+        led.b.set_high().unwrap();
+        led
     }
 
     pub fn set_state(&mut self, state_red: bool, state_green: bool, state_blue: bool) {

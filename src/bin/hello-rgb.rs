@@ -2,6 +2,7 @@
 #![no_std]
 
 use embedded_hal::blocking::delay::DelayMs;
+use hal::gpio::Level;
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, Timer};
 
 use airlog::{self as _, peripherals::led::LEDControl}; // global logger + panicking-behavior + memory layout
@@ -14,9 +15,9 @@ fn main() -> ! {
     let mut timer = Timer::new(board.TIMER0);
     let pins = P0Parts::new(board.P0);
     // We're using a common anode RGB LED, so it's active low
-    let led_r = pins.p0_03.degrade();
-    let led_g = pins.p0_04.degrade();
-    let led_b = pins.p0_28.degrade();
+    let led_r = pins.p0_03.into_push_pull_output(Level::High).degrade();
+    let led_g = pins.p0_04.into_push_pull_output(Level::High).degrade();
+    let led_b = pins.p0_28.into_push_pull_output(Level::High).degrade();
 
     let mut led = LEDControl::new(led_r, led_g, led_b);
 

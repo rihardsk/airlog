@@ -1,6 +1,7 @@
 #![no_main]
 #![no_std]
 
+pub mod future;
 pub mod logic;
 pub mod peripherals;
 
@@ -32,9 +33,9 @@ pub fn exit() -> ! {
 #[cfg(test)]
 #[defmt_test::tests]
 mod unit_tests {
-    use defmt::assert;
-    use super::peripherals::sgp40::tests as sgp40_tests;
     use super::logic::formatting::tests as formatting_tests;
+    use super::peripherals::sgp40::tests as sgp40_tests;
+    use defmt::assert;
 
     #[test]
     fn it_works() {

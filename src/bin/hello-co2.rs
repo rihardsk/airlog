@@ -14,7 +14,11 @@ use micromath::F32Ext;
 use nrf52840_hal::{self as hal, gpio::p0::Parts as P0Parts, gpio::p1::Parts as P1Parts, Timer};
 
 use airlog::{
-    self as _, logic::{self, formatting::{format_float_measurement, format_u32_measurement}},
+    self as _,
+    logic::{
+        self,
+        formatting::{format_float_measurement, format_u32_measurement},
+    },
     peripherals::{
         led::{LEDControl, PwmLEDControl},
         scd30::{SensorReading, SCD30},
@@ -49,8 +53,9 @@ fn main() -> ! {
     pwm.set_output_pin(pwm::Channel::C0, pin_r);
     pwm.set_output_pin(pwm::Channel::C1, pin_g);
     pwm.set_output_pin(pwm::Channel::C2, pin_b);
+    let (channel_red, channel_green, channel_blue, _) = pwm.split_channels();
 
-    let mut led = PwmLEDControl::new(pwm);
+    let mut led = PwmLEDControl::new(channel_red, channel_green, channel_blue);
 
     led.set_color(255, 0, 0);
     periodic_timer.delay_ms(300_u32);
