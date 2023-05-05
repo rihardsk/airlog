@@ -5,6 +5,7 @@ use cortex_m::prelude::{_embedded_hal_blocking_delay_DelayMs, _embedded_hal_time
 use embedded_hal::blocking::i2c;
 use hal::{
     gpio::Level,
+    pac::SPI1,
     prelude::OutputPin,
     pwm::{self, Pwm},
     twim, Temp, Twim,
@@ -25,6 +26,7 @@ use airlog::{
         sgp40::SGP40,
     },
 };
+use smart_leds::{SmartLedsWrite, RGB8};
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
@@ -44,27 +46,47 @@ fn main() -> ! {
     let mut lcd_timer = hal::Delay::new(core_peripherals.SYST);
     let mut sgp40_timer = Timer::one_shot(board.TIMER1);
 
-    let pwm = Pwm::new(board.PWM0);
+    // let pwm = Pwm::new(board.PWM0);
 
-    let pin_r = pins_1.p1_08.into_push_pull_output(Level::High).degrade();
-    let pin_b = pins_1.p1_07.into_push_pull_output(Level::High).degrade();
-    let pin_g = pins_1.p1_06.into_push_pull_output(Level::High).degrade();
+    // let pin_r = pins_1.p1_08.into_push_pull_output(Level::High).degrade();
+    // let pin_b = pins_1.p1_07.into_push_pull_output(Level::High).degrade();
+    // let pin_g = pins_1.p1_06.into_push_pull_output(Level::High).degrade();
 
-    pwm.set_output_pin(pwm::Channel::C0, pin_r);
-    pwm.set_output_pin(pwm::Channel::C1, pin_g);
-    pwm.set_output_pin(pwm::Channel::C2, pin_b);
-    let (channel_red, channel_green, channel_blue, _) = pwm.split_channels();
+    // pwm.set_output_pin(pwm::Channel::C0, pin_r);
+    // pwm.set_output_pin(pwm::Channel::C1, pin_g);
+    // pwm.set_output_pin(pwm::Channel::C2, pin_b);
+    // let (channel_red, channel_green, channel_blue, _) = pwm.split_channels();
 
-    let mut led = PwmLEDControl::new(channel_red, channel_green, channel_blue);
+    // let mut led = PwmLEDControl::new(channel_red, channel_green, channel_blue);
 
-    led.set_color(255, 0, 0);
-    periodic_timer.delay_ms(300_u32);
-    led.set_color(0, 255, 0);
-    periodic_timer.delay_ms(300_u32);
-    led.set_color(0, 0, 255);
-    periodic_timer.delay_ms(300_u32);
-    led.set_color(0, 0, 0);
-    periodic_timer.delay_ms(300_u32);
+    // led.set_color(255, 0, 0);
+    // periodic_timer.delay_ms(300_u32);
+    // led.set_color(0, 255, 0);
+    // periodic_timer.delay_ms(300_u32);
+    // led.set_color(0, 0, 255);
+    // periodic_timer.delay_ms(300_u32);
+    // led.set_color(0, 0, 0);
+    // periodic_timer.delay_ms(300_u32);
+
+    defmt::info!("Setting up neopixels");
+    let mosi = Some(pins_1.p1_01.into_push_pull_output(Level::Low).degrade());
+    let rgb_spi_pins = hal::spi::Pins {
+        sck: None,
+        mosi,
+        miso: None,
+    };
+    // Run the spi peripheral at 250 kbps which should equate to a 2 Mhz
+    // frequency which the ws2812 crate wants
+    let spi = hal::spi::Spi::new(
+        board.SPI1,
+        rgb_spi_pins,
+        hal::pac::spi0::frequency::FREQUENCY_A::K250,
+        ws2812_spi::MODE,
+    );
+    let mut neopixels = ws2812_spi::Ws2812::new(spi);
+    neopixels
+        .write([RGB8::new(255, 0, 0), RGB8::new(0, 255, 255)].into_iter())
+        .unwrap();
 
     let scl = pins_1.p1_04.into_floating_input().degrade();
     let sda = pins_1.p1_05.into_floating_input().degrade();
@@ -95,7 +117,7 @@ fn main() -> ! {
     for i in 0..=100 {
         let fraction = i as f32 / 100.;
         let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
-        led.set_color(r, g, b);
+        // led.set_color(r, g, b);
         periodic_timer.delay_ms(30_u32);
     }
     periodic_timer.delay_ms(100_u32);
@@ -167,7 +189,7 @@ fn main() -> ! {
             let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
             let fraction = fraction.max(0.);
             let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
-            led.set_color(r, g, b);
+            // led.set_color(r, g, b);
         }
 
         if seconds % 5 == 0 {
