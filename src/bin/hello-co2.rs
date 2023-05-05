@@ -81,9 +81,11 @@ fn main() -> ! {
         board.SPI1,
         rgb_spi_pins,
         hal::pac::spi0::frequency::FREQUENCY_A::K250,
+        // hal::pac::spi0::frequency::FREQUENCY_A::M2,
         ws2812_spi::MODE,
     );
     let mut neopixels = ws2812_spi::Ws2812::new(spi);
+    defmt::info!("Testing neopixels");
     neopixels
         .write([RGB8::new(255, 0, 0), RGB8::new(0, 255, 255)].into_iter())
         .unwrap();
