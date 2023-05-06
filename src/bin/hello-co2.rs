@@ -69,11 +69,13 @@ fn main() -> ! {
     // periodic_timer.delay_ms(300_u32);
 
     defmt::info!("Setting up neopixels");
-    let mosi = Some(pins_1.p1_01.into_push_pull_output(Level::Low).degrade());
+    let sck = Some(pins_1.p1_06.into_push_pull_output(Level::Low).degrade());
+    let mosi = Some(pins_1.p1_08.into_push_pull_output(Level::Low).degrade());
+    let miso = Some(pins_1.p1_07.into_floating_input().degrade());
     let rgb_spi_pins = hal::spi::Pins {
-        sck: None,
+        sck,
         mosi,
-        miso: None,
+        miso,
     };
     // Run the spi peripheral at 250 kbps which should equate to a 2 Mhz
     // frequency which the ws2812 crate wants
