@@ -100,7 +100,7 @@ fn main() -> ! {
     let mut color_history = [RGB8::default(); 20];
     for i in 0..=100 {
         let fraction = i as f32 / 100.;
-        let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
+        let (r, g, b) = logic::colormap::co2_map_rgb(fraction);
         // Scale the values so that we retain eyesight
         let r = (r as f32 / 8.) as u8;
         let g = (g as f32 / 8.) as u8;
@@ -179,6 +179,9 @@ fn main() -> ! {
     let mut voc_index: u16;
     let mut builtin_led_state = hal::prelude::PinState::Low;
     let mut builtin_temperature: f32 = 25.;
+    let mut rgb_co2 = RGB8::default();
+    let mut rgb_voc = RGB8::default();
+    let mut rgb_temp = RGB8::default();
     periodic_timer.start(1_000_000_u32);
     loop {
         // periodic_timer.start(1000_u32);
@@ -193,24 +196,48 @@ fn main() -> ! {
             // current baseline ppm is 424
             let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
             let fraction = fraction.max(0.);
-            let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
+            let (r, g, b) = logic::colormap::co2_map_rgb(fraction);
             // Scale the values so that we retain eyesight
             let r = (r as f32 / 8.) as u8;
             let g = (g as f32 / 8.) as u8;
             let b = (b as f32 / 8.) as u8;
-            let rgb = RGB8::new(r, g, b);
-            // TODO: use other leds for different stuff
-            smartled.write([rgb, rgb, rgb].into_iter()).unwrap();
+            rgb_co2 = RGB8::new(r, g, b);
+            smartled
+                .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
+                .unwrap();
         }
 
         if seconds % 5 == 0 {
             builtin_temperature = temp.measure().to_num();
+
+            let fraction = builtin_temperature / 45.;
+            let fraction = fraction.max(0.);
+            let (r, g, b) = logic::colormap::temp_map_rgb(fraction);
+            // Scale the values so that we retain eyesight
+            let r = (r as f32 / 8.) as u8;
+            let g = (g as f32 / 8.) as u8;
+            let b = (b as f32 / 8.) as u8;
+            rgb_temp = RGB8::new(r, g, b);
+            smartled
+                .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
+                .unwrap();
         }
 
         let voc_temp = builtin_temperature.round() as i16;
         let voc_humidity = reading.rel_humidity.round() as u8;
         voc_index = sgp40
             .measure_signal_compensated(voc_temp, voc_humidity, &mut sgp40_timer)
+            .unwrap();
+        let fraction = voc_index as f32 / 500.;
+        let fraction = fraction.max(0.);
+        let (r, g, b) = logic::colormap::voc_map_rgb(fraction);
+        // Scale the values so that we retain eyesight
+        let r = (r as f32 / 8.) as u8;
+        let g = (g as f32 / 8.) as u8;
+        let b = (b as f32 / 8.) as u8;
+        rgb_voc = RGB8::new(r, g, b);
+        smartled
+            .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
             .unwrap();
 
         if seconds % 5 == 0 {
