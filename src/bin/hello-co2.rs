@@ -46,19 +46,21 @@ fn main() -> ! {
     let mut lcd_timer = hal::Delay::new(core_peripherals.SYST);
     let mut sgp40_timer = Timer::one_shot(board.TIMER1);
 
-    // let pwm = Pwm::new(board.PWM0);
+    defmt::info!("Setting up neopixels");
+    let pin_smartled = pins_1.p1_08.into_push_pull_output(Level::Low).degrade();
+    let mut smartled = nrf_smartled::pwm::Pwm::new(board.PWM0, pin_smartled);
+    smartled
+        .write(
+            [
+                RGB8::new(15, 0, 0),
+                RGB8::new(0, 15, 15),
+                RGB8::new(15, 0, 15),
+            ]
+            .into_iter(),
+        )
+        .unwrap();
 
-    // let pin_r = pins_1.p1_08.into_push_pull_output(Level::High).degrade();
-    // let pin_b = pins_1.p1_07.into_push_pull_output(Level::High).degrade();
-    // let pin_g = pins_1.p1_06.into_push_pull_output(Level::High).degrade();
-
-    // pwm.set_output_pin(pwm::Channel::C0, pin_r);
-    // pwm.set_output_pin(pwm::Channel::C1, pin_g);
-    // pwm.set_output_pin(pwm::Channel::C2, pin_b);
-    // let (channel_red, channel_green, channel_blue, _) = pwm.split_channels();
-
-    // let mut led = PwmLEDControl::new(channel_red, channel_green, channel_blue);
-
+    // TODO: mby shine some pretty colors with the smartleds
     // led.set_color(255, 0, 0);
     // periodic_timer.delay_ms(300_u32);
     // led.set_color(0, 255, 0);
@@ -67,30 +69,6 @@ fn main() -> ! {
     // periodic_timer.delay_ms(300_u32);
     // led.set_color(0, 0, 0);
     // periodic_timer.delay_ms(300_u32);
-
-    defmt::info!("Setting up neopixels");
-    let sck = Some(pins_1.p1_06.into_push_pull_output(Level::Low).degrade());
-    let mosi = Some(pins_1.p1_08.into_push_pull_output(Level::Low).degrade());
-    let miso = Some(pins_1.p1_07.into_floating_input().degrade());
-    let rgb_spi_pins = hal::spi::Pins {
-        sck,
-        mosi,
-        miso,
-    };
-    // Run the spi peripheral at 250 kbps which should equate to a 2 Mhz
-    // frequency which the ws2812 crate wants
-    let spi = hal::spi::Spi::new(
-        board.SPI1,
-        rgb_spi_pins,
-        hal::pac::spi0::frequency::FREQUENCY_A::K250,
-        // hal::pac::spi0::frequency::FREQUENCY_A::M2,
-        ws2812_spi::MODE,
-    );
-    let mut neopixels = ws2812_spi::Ws2812::new(spi);
-    defmt::info!("Testing neopixels");
-    neopixels
-        .write([RGB8::new(255, 0, 0), RGB8::new(0, 255, 255)].into_iter())
-        .unwrap();
 
     let scl = pins_1.p1_04.into_floating_input().degrade();
     let sda = pins_1.p1_05.into_floating_input().degrade();
@@ -118,10 +96,33 @@ fn main() -> ! {
         scd30.set_temperature_offset(desired_offset).unwrap();
     }
 
+    // Just shine some pretty colors in a loop for a while
+    let mut color_history = [RGB8::default(); 20];
     for i in 0..=100 {
         let fraction = i as f32 / 100.;
         let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
-        // led.set_color(r, g, b);
+        // Scale the values so that we retain eyesight
+        let r = (r as f32 / 8.) as u8;
+        let g = (g as f32 / 8.) as u8;
+        let b = (b as f32 / 8.) as u8;
+        let rgb = RGB8::new(r, g, b);
+        let l = color_history.len();
+        color_history[i % l] = rgb;
+        let past_color_1 = if i >= 9 {
+            color_history[(l + i - 9) % l]
+        } else {
+            rgb
+        };
+        let past_color_2 = if i >= 19 {
+            color_history[(l + i - 19) % l]
+        } else {
+            past_color_1
+        };
+
+        smartled
+            .write([rgb, past_color_1, past_color_2].into_iter())
+            .unwrap();
+
         periodic_timer.delay_ms(30_u32);
     }
     periodic_timer.delay_ms(100_u32);
@@ -193,7 +194,13 @@ fn main() -> ! {
             let fraction = (reading.co2 - 424.) / (3000 - 424) as f32;
             let fraction = fraction.max(0.);
             let (r, g, b) = logic::colormap::smart_map_rgb(fraction);
-            // led.set_color(r, g, b);
+            // Scale the values so that we retain eyesight
+            let r = (r as f32 / 8.) as u8;
+            let g = (g as f32 / 8.) as u8;
+            let b = (b as f32 / 8.) as u8;
+            let rgb = RGB8::new(r, g, b);
+            // TODO: use other leds for different stuff
+            smartled.write([rgb, rgb, rgb].into_iter()).unwrap();
         }
 
         if seconds % 5 == 0 {
