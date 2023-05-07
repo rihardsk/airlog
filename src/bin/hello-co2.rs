@@ -70,6 +70,10 @@ fn main() -> ! {
     // led.set_color(0, 0, 0);
     // periodic_timer.delay_ms(300_u32);
 
+    smartled
+        .write([RGB8::new(0, 15, 15), RGB8::default(), RGB8::default()].into_iter())
+        .unwrap();
+
     let scl = pins_1.p1_04.into_floating_input().degrade();
     let sda = pins_1.p1_05.into_floating_input().degrade();
     let twim_pins = twim::Pins { scl, sda };
@@ -78,12 +82,21 @@ fn main() -> ! {
     defmt::info!("Setting up SCD30");
 
     let mut scd30 = SCD30::new(i2c);
+    smartled
+        .write([RGB8::new(15, 0, 0), RGB8::default(), RGB8::default()].into_iter())
+        .unwrap();
     let version = scd30.get_firmware_version().unwrap();
+    smartled
+        .write([RGB8::new(0, 15, 0), RGB8::default(), RGB8::default()].into_iter())
+        .unwrap();
     defmt::info!(
         "SCD30 firmware version: {=u8}.{=u8}",
         version.major,
         version.minor
     );
+    smartled
+        .write([RGB8::new(15, 15, 0), RGB8::default(), RGB8::default()].into_iter())
+        .unwrap();
     let desired_offset: f32 = 3.72;
     let temperature_offset = scd30.read_temperature_offset().unwrap();
     defmt::info!(
@@ -95,6 +108,9 @@ fn main() -> ! {
         defmt::info!("SCD30 – setting temp. offset to {=f32}", desired_offset);
         scd30.set_temperature_offset(desired_offset).unwrap();
     }
+    smartled
+        .write([RGB8::new(0, 0, 15), RGB8::default(), RGB8::default()].into_iter())
+        .unwrap();
 
     // Just shine some pretty colors in a loop for a while
     let mut color_history = [RGB8::default(); 20];
