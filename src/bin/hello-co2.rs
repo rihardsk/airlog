@@ -59,6 +59,7 @@ fn main() -> ! {
             .into_iter(),
         )
         .unwrap();
+    periodic_timer.delay_ms(300_u32);
 
     // TODO: mby shine some pretty colors with the smartleds
     // led.set_color(255, 0, 0);
@@ -73,6 +74,7 @@ fn main() -> ! {
     smartled
         .write([RGB8::new(0, 15, 15), RGB8::default(), RGB8::default()].into_iter())
         .unwrap();
+    periodic_timer.delay_ms(300_u32);
 
     let scl = pins_1.p1_04.into_floating_input().degrade();
     let sda = pins_1.p1_05.into_floating_input().degrade();
