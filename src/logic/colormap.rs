@@ -38,15 +38,38 @@ const SIMPLE_DATA: [(f32, f32, f32); 4] = [
     (0., 0., 1.),
 ];
 
+// TODO: make an abstraction for color position specification so that they're
+// not hardcoded here
+
 type ColorSegment = (f32, f32, f32, f32);
 #[rustfmt::skip]
-const SIMPLE_DATA_WITH_POSITION: [ColorSegment; 4] = [
+const CO2_COLORS: [ColorSegment; 4] = [
     // Set some points relative to some specific co2 values. We take 424 ppm as
     // base and 3000 ppm as the maximum
     (0., 1., 0., 0.),
     (1., 1., 0., ((1000. - 424.) / (3000. - 424.))),
     (1., 0., 0., ((1600. - 424.) / (3000. - 424.))),
     (0., 0., 1., 1.),
+];
+
+const VOC_COLORS: [ColorSegment; 4] = [
+    // Set some points relative to some specific Sensiron VOC index values which
+    // range from 0 to 500 with 100 representing average air quality
+    (0., 0., 1., 0.),
+    (0., 1., 0., (100. / 500.)),
+    (1., 1., 0., (200. / 500.)),
+    (1., 0., 0., 1.),
+];
+
+const TEMP_COLORS: [ColorSegment; 4] = [
+    // TODO: make this work for negative temperatures
+    //
+    // Set some points relative to some specific temperatures. 45 degrees will
+    // be the "maximum" temperature
+    (0., 0., 1., 0.),
+    (0., 1., 0., (15. / 45.)),
+    (1., 1., 0., (25. / 45.)),
+    (1., 0., 0., 1.),
 ];
 
 pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f32, f32, f32) {
@@ -121,10 +144,26 @@ pub fn simple_map_rgb(fraction: f32) -> (u8, u8, u8) {
     fractions_to_rgb(simple_map(fraction))
 }
 
-pub fn smart_map(fraction: f32) -> (f32, f32, f32) {
-    linear_position_interpolating_map(&SIMPLE_DATA_WITH_POSITION, fraction)
+pub fn co2_map(fraction: f32) -> (f32, f32, f32) {
+    linear_position_interpolating_map(&CO2_COLORS, fraction)
 }
 
-pub fn smart_map_rgb(fraction: f32) -> (u8, u8, u8) {
-    fractions_to_rgb(smart_map(fraction))
+pub fn co2_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(co2_map(fraction))
+}
+
+pub fn voc_map(fraction: f32) -> (f32, f32, f32) {
+    linear_position_interpolating_map(&VOC_COLORS, fraction)
+}
+
+pub fn voc_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(voc_map(fraction))
+}
+
+pub fn temp_map(fraction: f32) -> (f32, f32, f32) {
+    linear_position_interpolating_map(&TEMP_COLORS, fraction)
+}
+
+pub fn temp_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(temp_map(fraction))
 }
