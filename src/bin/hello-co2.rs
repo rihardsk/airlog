@@ -84,6 +84,7 @@ fn main() -> ! {
     let i2c_bus = shared_bus::BusManagerSimple::new(i2c);
     let i2c_proxy1 = i2c_bus.acquire_i2c();
     let i2c_proxy2 = i2c_bus.acquire_i2c();
+    let i2c_proxy3 = i2c_bus.acquire_i2c();
 
     defmt::info!("Setting up SCD30");
 
@@ -154,6 +155,29 @@ fn main() -> ! {
     // making the first measurement
     let mut sgp40 = SGP40::new(i2c_proxy2, 1.);
 
+    defmt::info!("Initializing BMP388 pressure sensor");
+    // 0x76 is the address we get when the SDO pin of BMP388 is connected to
+    // ground (as per documentation)
+    let mut bmp388 = bmp388::BMP388::new(i2c_proxy3, 0x76, &mut periodic_timer).unwrap();
+    // The choices here are rather arbitrary
+    bmp388
+        .set_power_control(bmp388::PowerControl {
+            pressure_enable: true,
+            temperature_enable: true,
+            mode: bmp388::PowerMode::Normal,
+        })
+        .unwrap();
+    bmp388
+        .set_sampling_rate(bmp388::SamplingRate::ms40)
+        .unwrap();
+    bmp388.set_filter(bmp388::Filter::c3).unwrap();
+    bmp388
+        .set_oversampling(bmp388::OversamplingConfig {
+            osr_p: bmp388::Oversampling::x4,
+            osr4_t: bmp388::Oversampling::x1
+        })
+        .unwrap();
+
     defmt::info!("Initializing LCD");
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
     let en = pins_1.p1_11.into_push_pull_output(Level::Low);
@@ -194,6 +218,7 @@ fn main() -> ! {
     let mut voc_index: u16;
     let mut builtin_led_state = hal::prelude::PinState::Low;
     let mut builtin_temperature: f32 = 25.;
+    let mut pressure_data: bmp388::SensorData;
     let mut rgb_co2 = RGB8::default();
     let mut rgb_voc = RGB8::default();
     let mut rgb_temp = RGB8::default();
@@ -256,21 +281,27 @@ fn main() -> ! {
             .unwrap();
 
         if seconds % 5 == 0 {
+            pressure_data = bmp388.sensor_values().unwrap();
+
             defmt::info!(
                 "
                 CO2 {=f32} ppm
                 Temperature {=f32} °C
                 Temp. builtin {=f32} °C
+                Temp. bmp388 {=f64} °C
                 Temp. diff {=f32} °C
                 Rel. humidity {=f32} %
                 VOC idx {=u16}
+                Pressue {=f64} Pa
             ",
                 reading.co2,
                 reading.temperature,
                 builtin_temperature,
+                pressure_data.temperature,
                 reading.temperature - builtin_temperature,
                 reading.rel_humidity,
-                voc_index
+                voc_index,
+                pressure_data.pressure,
             );
 
             lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
