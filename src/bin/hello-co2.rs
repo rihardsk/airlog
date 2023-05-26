@@ -80,10 +80,14 @@ fn main() -> ! {
     let sda = pins_1.p1_05.into_floating_input().degrade();
     let twim_pins = twim::Pins { scl, sda };
     let i2c = Twim::new(board.TWIM0, twim_pins, twim::Frequency::K100);
+    // As long as we only use a single task/thread, we can use BusManagerSimple
+    let i2c_bus = shared_bus::BusManagerSimple::new(i2c);
+    let i2c_proxy1 = i2c_bus.acquire_i2c();
+    let i2c_proxy2 = i2c_bus.acquire_i2c();
 
     defmt::info!("Setting up SCD30");
 
-    let mut scd30 = SCD30::new(i2c);
+    let mut scd30 = SCD30::new(i2c_proxy1);
     smartled
         .write([RGB8::new(15, 0, 0), RGB8::default(), RGB8::default()].into_iter())
         .unwrap();
@@ -146,18 +150,11 @@ fn main() -> ! {
     periodic_timer.delay_ms(100_u32);
 
     defmt::info!("Initializing SGP40 VOC sensor");
-    // TODO: share the previous i2c
-    let sda2 = pins_1.p1_02.into_floating_input().degrade();
-    let scl2 = pins_1.p1_03.into_floating_input().degrade();
-    let twim_pins2 = twim::Pins {
-        scl: scl2,
-        sda: sda2,
-    };
-    let i2c2 = Twim::new(board.TWIM1, twim_pins2, twim::Frequency::K100);
     // NOTE: don't forget that there must be atleast 0.6ms of delay before
     // making the first measurement
-    let mut sgp40 = SGP40::new(i2c2, 1.);
+    let mut sgp40 = SGP40::new(i2c_proxy2, 1.);
 
+    defmt::info!("Initializing LCD");
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
     let en = pins_1.p1_11.into_push_pull_output(Level::Low);
     let d4 = pins_1.p1_12.into_push_pull_output(Level::Low);
