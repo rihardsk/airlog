@@ -158,25 +158,33 @@ fn main() -> ! {
     defmt::info!("Initializing BMP388 pressure sensor");
     // 0x76 is the address we get when the SDO pin of BMP388 is connected to
     // ground (as per documentation)
-    let mut bmp388 = bmp388::BMP388::new(i2c_proxy3, 0x76, &mut periodic_timer).unwrap();
+    let mut bmp388 = bmp388::BMP388::new(i2c_proxy3, 0x76, &mut periodic_timer).ok();
     // The choices here are rather arbitrary
+    bmp388.as_mut().map(|sensor| {
+        sensor
+            .set_power_control(bmp388::PowerControl {
+                pressure_enable: true,
+                temperature_enable: true,
+                mode: bmp388::PowerMode::Normal,
+            })
+            .unwrap()
+    });
+    bmp388.as_mut().map(|sensor| {
+        sensor
+            .set_sampling_rate(bmp388::SamplingRate::ms10)
+            .unwrap()
+    });
     bmp388
-        .set_power_control(bmp388::PowerControl {
-            pressure_enable: true,
-            temperature_enable: true,
-            mode: bmp388::PowerMode::Normal,
-        })
-        .unwrap();
-    bmp388
-        .set_sampling_rate(bmp388::SamplingRate::ms40)
-        .unwrap();
-    bmp388.set_filter(bmp388::Filter::c3).unwrap();
-    bmp388
-        .set_oversampling(bmp388::OversamplingConfig {
-            osr_p: bmp388::Oversampling::x4,
-            osr4_t: bmp388::Oversampling::x1
-        })
-        .unwrap();
+        .as_mut()
+        .map(|sensor| sensor.set_filter(bmp388::Filter::c3).unwrap());
+    bmp388.as_mut().map(|sensor| {
+        sensor
+            .set_oversampling(bmp388::OversamplingConfig {
+                osr_p: bmp388::Oversampling::x4,
+                osr4_t: bmp388::Oversampling::x1,
+            })
+            .unwrap()
+    });
 
     defmt::info!("Initializing LCD");
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
@@ -218,7 +226,7 @@ fn main() -> ! {
     let mut voc_index: u16;
     let mut builtin_led_state = hal::prelude::PinState::Low;
     let mut builtin_temperature: f32 = 25.;
-    let mut pressure_data: bmp388::SensorData;
+    let mut pressure_data: Option<bmp388::SensorData>;
     let mut rgb_co2 = RGB8::default();
     let mut rgb_voc = RGB8::default();
     let mut rgb_temp = RGB8::default();
@@ -281,27 +289,30 @@ fn main() -> ! {
             .unwrap();
 
         if seconds % 5 == 0 {
-            pressure_data = bmp388.sensor_values().unwrap();
+            pressure_data = bmp388
+                .as_mut()
+                .and_then(|sensor| sensor.sensor_values().ok());
 
+            // TODO: figure out how to specify {=Option<f64>} explicitly
             defmt::info!(
                 "
                 CO2 {=f32} ppm
                 Temperature {=f32} °C
                 Temp. builtin {=f32} °C
-                Temp. bmp388 {=f64} °C
+                Temp. bmp388 {} °C
                 Temp. diff {=f32} °C
                 Rel. humidity {=f32} %
                 VOC idx {=u16}
-                Pressue {=f64} Pa
+                Pressue {} Pa
             ",
                 reading.co2,
                 reading.temperature,
                 builtin_temperature,
-                pressure_data.temperature,
+                pressure_data.map(|rust_is_too_verbose| rust_is_too_verbose.temperature),
                 reading.temperature - builtin_temperature,
                 reading.rel_humidity,
                 voc_index,
-                pressure_data.pressure,
+                pressure_data.map(|rust_is_too_verbose| rust_is_too_verbose.pressure),
             );
 
             lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
