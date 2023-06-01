@@ -45,6 +45,7 @@ fn main() -> ! {
     // let mut lcd_timer = Timer::one_shot(board.TIMER1);
     let mut lcd_timer = hal::Delay::new(core_peripherals.SYST);
     let mut sgp40_timer = Timer::one_shot(board.TIMER1);
+    let mut sps30_timer = Timer::one_shot(board.TIMER2);
 
     defmt::info!("Setting up neopixels");
     let pin_smartled = pins_1.p1_08.into_push_pull_output(Level::Low).degrade();
@@ -85,6 +86,7 @@ fn main() -> ! {
     let i2c_proxy1 = i2c_bus.acquire_i2c();
     let i2c_proxy2 = i2c_bus.acquire_i2c();
     let i2c_proxy3 = i2c_bus.acquire_i2c();
+    let i2c_proxy4 = i2c_bus.acquire_i2c();
 
     defmt::info!("Setting up SCD30");
 
@@ -186,6 +188,16 @@ fn main() -> ! {
             .unwrap()
     });
 
+    defmt::info!("Initializing SPS30 particulate matter sensor");
+    let mut sps30 = sps30_i2c::Sps30::new_sps30(i2c_proxy4, sps30_timer);
+    let mut random = hal::rng::Rng::new(board.RNG);
+    // TODO: adjust the probability
+    if (random.random_u8() < 127) {
+        defmt::info!("Performing SPS30 cleaning");
+        sps30.start_fan_cleaning();
+    }
+    sps30.start_measurement();
+
     defmt::info!("Initializing LCD");
     let rs = pins_1.p1_10.into_push_pull_output(Level::Low);
     let en = pins_1.p1_11.into_push_pull_output(Level::Low);
@@ -230,6 +242,7 @@ fn main() -> ! {
     let mut rgb_co2 = RGB8::default();
     let mut rgb_voc = RGB8::default();
     let mut rgb_temp = RGB8::default();
+    let mut pm25_data = sps30_i2c::AirInfo::default();
     periodic_timer.start(1_000_000_u32);
     loop {
         // periodic_timer.start(1000_u32);
@@ -253,6 +266,13 @@ fn main() -> ! {
             smartled
                 .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
                 .unwrap();
+
+            loop {
+                if sps30.read_data_ready_flag().unwrap() {
+                    break;
+                }
+            }
+            pm25_data = sps30.read_measured_values().unwrap();
         }
 
         if seconds % 5 == 0 {
@@ -304,6 +324,17 @@ fn main() -> ! {
                 Rel. humidity {=f32} %
                 VOC idx {=u16}
                 Pressue {} Pa
+                ====== Particles ======
+                Mass concentration PM1.0 {=f32} μg/m³
+                Mass concentration PM2.5 {=f32} μg/m³
+                Mass concentration PM4.0 {=f32} μg/m³
+                Mass concentration PM10 {=f32} μg/m³
+                Number concentration PM0.5 {=f32} #/cm³
+                Number concentration PM1.0 {=f32} #/cm³
+                Number concentration PM2.5 {=f32} #/cm³
+                Number concentration PM4.0 {=f32} #/cm³
+                Number concentration PM10 {=f32} #/cm³
+                Typical size {=f32} μm
             ",
                 reading.co2,
                 reading.temperature,
@@ -313,6 +344,16 @@ fn main() -> ! {
                 reading.rel_humidity,
                 voc_index,
                 pressure_data.map(|rust_is_too_verbose| rust_is_too_verbose.pressure),
+                pm25_data.mass_pm1_0,
+                pm25_data.mass_pm2_5,
+                pm25_data.mass_pm4_0,
+                pm25_data.mass_pm10,
+                pm25_data.number_pm0_5,
+                pm25_data.number_pm1_0,
+                pm25_data.number_pm2_5,
+                pm25_data.number_pm4_0,
+                pm25_data.number_pm10,
+                pm25_data.typical_size,
             );
 
             lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();

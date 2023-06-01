@@ -34,6 +34,7 @@ smart-leds = "0.3.0"
 nrf-smartled = { path = "../nrf-smartled", features = ["52840"] }
 bmp388 = { path = "../bmp388" }
 shared-bus = "0.2.5"
+sps30-i2c = { version = "0.1.0", path = "../sps30-i2c-rs" }
 
 [dev-dependencies]
 defmt-test = "0.3"

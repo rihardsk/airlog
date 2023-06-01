@@ -24,6 +24,7 @@ dependencies = [
  "panic-probe",
  "shared-bus",
  "smart-leds",
+ "sps30-i2c",
  "ufmt",
 ]
 
@@ -543,6 +544,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "sps30-i2c"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "embedded-hal",
 ]
 
 [[package]]
