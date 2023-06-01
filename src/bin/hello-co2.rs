@@ -316,25 +316,25 @@ fn main() -> ! {
             // TODO: figure out how to specify {=Option<f64>} explicitly
             defmt::info!(
                 "
-                CO2 {=f32} ppm
-                Temperature {=f32} °C
-                Temp. builtin {=f32} °C
-                Temp. bmp388 {} °C
-                Temp. diff {=f32} °C
-                Rel. humidity {=f32} %
-                VOC idx {=u16}
-                Pressue {} Pa
+                CO2: {=f32} ppm
+                Temperature: {=f32} °C
+                Temp. builtin: {=f32} °C
+                Temp. bmp388: {} °C
+                Temp. diff: {=f32} °C
+                Rel. humidity: {=f32} %
+                VOC idx: {=u16}
+                Pressue: {} Pa
                 ====== Particles ======
-                Mass concentration PM1.0 {=f32} μg/m³
-                Mass concentration PM2.5 {=f32} μg/m³
-                Mass concentration PM4.0 {=f32} μg/m³
-                Mass concentration PM10 {=f32} μg/m³
-                Number concentration PM0.5 {=f32} #/cm³
-                Number concentration PM1.0 {=f32} #/cm³
-                Number concentration PM2.5 {=f32} #/cm³
-                Number concentration PM4.0 {=f32} #/cm³
-                Number concentration PM10 {=f32} #/cm³
-                Typical size {=f32} μm
+                Mass concentration PM1.0: {=f32} μg/m³
+                Mass concentration PM2.5: {=f32} μg/m³
+                Mass concentration PM4.0: {=f32} μg/m³
+                Mass concentration PM10: {=f32} μg/m³
+                Number concentration PM0.5: {=f32} #/cm³
+                Number concentration PM1.0: {=f32} #/cm³
+                Number concentration PM2.5: {=f32} #/cm³
+                Number concentration PM4.0: {=f32} #/cm³
+                Number concentration PM10: {=f32} #/cm³
+                Typical size: {=f32} μm
             ",
                 reading.co2,
                 reading.temperature,
