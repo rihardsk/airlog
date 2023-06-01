@@ -189,12 +189,27 @@ fn main() -> ! {
     });
 
     defmt::info!("Initializing SPS30 particulate matter sensor");
+    // TODO: do we need to pull the i2c lines up to 5V (in hardware, as per the
+    // datasheet). Seems to be doing ok without it, though
     let mut sps30 = sps30_i2c::Sps30::new_sps30(i2c_proxy4, sps30_timer);
     let mut random = hal::rng::Rng::new(board.RNG);
-    // TODO: adjust the probability
-    if (random.random_u8() < 127) {
+    let rand_u8 = random.random_u8();
+    // Perform cleaning with p = 0.1, so that we don't needlessly do it on every
+    // startup. There's also automatic cleaning, which we don't have to manage.
+    // We do manual cleaning for occasions where the sensor doesn't run long
+    // enough to trigger automatic cleaning (which happens after a week of
+    // runtime).
+    let threshold = (u8::MAX as f32 / 10.) as u8;
+    defmt::info!(
+        "Rolled {=u8} (must not exceed {=u8} to perform cleaning)",
+        rand_u8,
+        threshold
+    );
+    if (rand_u8 < threshold) {
         defmt::info!("Performing SPS30 cleaning");
         sps30.start_fan_cleaning();
+    } else {
+        defmt::info!("NOT performing SPS30 cleaning");
     }
     sps30.start_measurement();
 
