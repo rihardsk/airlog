@@ -83,14 +83,14 @@ fn main() -> ! {
     let i2c = Twim::new(board.TWIM0, twim_pins, twim::Frequency::K100);
     // As long as we only use a single task/thread, we can use BusManagerSimple
     let i2c_bus = shared_bus::BusManagerSimple::new(i2c);
-    let i2c_proxy1 = i2c_bus.acquire_i2c();
-    let i2c_proxy2 = i2c_bus.acquire_i2c();
-    let i2c_proxy3 = i2c_bus.acquire_i2c();
-    let i2c_proxy4 = i2c_bus.acquire_i2c();
+    let i2c_proxy_scd30 = i2c_bus.acquire_i2c();
+    let i2c_proxy_sgp40 = i2c_bus.acquire_i2c();
+    let i2c_proxy_bmp388 = i2c_bus.acquire_i2c();
+    let i2c_proxy_sps30 = i2c_bus.acquire_i2c();
 
     defmt::info!("Setting up SCD30");
 
-    let mut scd30 = SCD30::new(i2c_proxy1);
+    let mut scd30 = SCD30::new(i2c_proxy_scd30);
     smartled
         .write([RGB8::new(15, 0, 0), RGB8::default(), RGB8::default()].into_iter())
         .unwrap();
@@ -155,12 +155,12 @@ fn main() -> ! {
     defmt::info!("Initializing SGP40 VOC sensor");
     // NOTE: don't forget that there must be atleast 0.6ms of delay before
     // making the first measurement
-    let mut sgp40 = SGP40::new(i2c_proxy2, 1.);
+    let mut sgp40 = SGP40::new(i2c_proxy_sgp40, 1.);
 
     defmt::info!("Initializing BMP388 pressure sensor");
     // 0x76 is the address we get when the SDO pin of BMP388 is connected to
     // ground (as per documentation)
-    let mut bmp388 = bmp388::BMP388::new(i2c_proxy3, 0x76, &mut periodic_timer).ok();
+    let mut bmp388 = bmp388::BMP388::new(i2c_proxy_bmp388, 0x76, &mut periodic_timer).ok();
     // The choices here are rather arbitrary
     bmp388.as_mut().map(|sensor| {
         sensor
@@ -191,7 +191,7 @@ fn main() -> ! {
     defmt::info!("Initializing SPS30 particulate matter sensor");
     // TODO: do we need to pull the i2c lines up to 5V (in hardware, as per the
     // datasheet). Seems to be doing ok without it, though
-    let mut sps30 = sps30_i2c::Sps30::new_sps30(i2c_proxy4, sps30_timer);
+    let mut sps30 = sps30_i2c::Sps30::new_sps30(i2c_proxy_sps30, sps30_timer);
     let mut random = hal::rng::Rng::new(board.RNG);
     let rand_u8 = random.random_u8();
     // Perform cleaning with p = 0.1, so that we don't needlessly do it on every
