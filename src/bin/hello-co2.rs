@@ -21,6 +21,7 @@ use airlog::{
         formatting::{format_float_measurement, format_u32_measurement},
     },
     peripherals::{
+        button::Button,
         led::{LEDControl, PwmLEDControl},
         scd30::{SensorReading, SCD30},
         sgp40::SGP40,
@@ -37,6 +38,7 @@ fn main() -> ! {
     let pins_0 = P0Parts::new(board.P0);
     let pins_1 = P1Parts::new(board.P1);
     let mut temp = Temp::new(board.TEMP);
+    let mut button = Button::new(pins_0.p0_11.into_pullup_input());
 
     let mut builtin_led_1 = pins_0.p0_13.into_push_pull_output(Level::High);
 
@@ -190,7 +192,7 @@ fn main() -> ! {
 
     defmt::info!("Initializing SPS30 particulate matter sensor");
     // TODO: do we need to pull the i2c lines up to 5V (in hardware, as per the
-    // datasheet). Seems to be doing ok without it, though
+    // datasheet)? Seems to be doing ok without it, though
     let mut sps30 = sps30_i2c::Sps30::new_sps30(i2c_proxy_sps30, sps30_timer);
     let mut random = hal::rng::Rng::new(board.RNG);
     let rand_u8 = random.random_u8();
@@ -205,7 +207,7 @@ fn main() -> ! {
         rand_u8,
         threshold
     );
-    if (rand_u8 < threshold) {
+    if rand_u8 < threshold {
         defmt::info!("Performing SPS30 cleaning");
         sps30.start_fan_cleaning();
     } else {
@@ -258,8 +260,16 @@ fn main() -> ! {
     let mut rgb_voc = RGB8::default();
     let mut rgb_temp = RGB8::default();
     let mut pm25_data = sps30_i2c::AirInfo::default();
+    let mut lcd_output_type = InfoType::GasesAndParticles;
     periodic_timer.start(1_000_000_u32);
     loop {
+        // One loop iteration runs for a second, so the button must be held for
+        // at least that long for this line to trigger
+        if button.check_rising_edge() {
+            lcd_output_type = lcd_output_type.next();
+            defmt::info!("Switched output to {:?}", lcd_output_type);
+        }
+
         // periodic_timer.start(1000_u32);
         if seconds % 3 == 0 {
             loop {
@@ -380,16 +390,30 @@ fn main() -> ! {
             let voc_text = format_u32_measurement(voc_index as u32, 3, "voc");
             lcd.write_str(&voc_text, &mut lcd_timer).unwrap();
 
-            lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
-            // TODO: Can't output °, because it's probably part of unicode, not
-            // ascii, See if there's a workaround using the hd44780 font table
-            let temp_text = format_float_measurement(builtin_temperature, 2, 2, "C");
-            lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
+            match lcd_output_type {
+                InfoType::GasesAndTemp => {
+                    lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
+                    // TODO: Can't output °, because it's probably part of unicode, not
+                    // ascii, See if there's a workaround using the hd44780 font table
+                    let temp_text = format_float_measurement(builtin_temperature, 2, 2, "C");
+                    lcd.write_str(&temp_text, &mut lcd_timer).unwrap();
 
-            lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
-            lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
-            let humidity_text = format_float_measurement(reading.rel_humidity, 2, 2, "%");
-            lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
+                    lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+                    lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+                    let humidity_text = format_float_measurement(reading.rel_humidity, 2, 2, "%");
+                    lcd.write_str(&humidity_text, &mut lcd_timer).unwrap();
+                }
+                InfoType::GasesAndParticles => {
+                    lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
+                    let pm25_text = format_float_measurement(pm25_data.mass_pm2_5, 2, 1, "ug");
+                    lcd.write_str(&pm25_text, &mut lcd_timer).unwrap();
+
+                    lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+                    lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+                    let pm10_text = format_float_measurement(pm25_data.mass_pm10, 2, 1, "ug");
+                    lcd.write_str(&pm10_text, &mut lcd_timer).unwrap();
+                }
+            }
         }
 
         builtin_led_1.set_state(builtin_led_state).unwrap();
@@ -404,5 +428,22 @@ fn toggle_pin_state(value: hal::prelude::PinState) -> hal::prelude::PinState {
     match value {
         hal::prelude::PinState::Low => hal::prelude::PinState::High,
         hal::prelude::PinState::High => hal::prelude::PinState::Low,
+    }
+}
+
+#[derive(Debug, Copy, Clone, defmt::Format)]
+enum InfoType {
+    /// Display CO2, VOC index, temperature and relative humidity
+    GasesAndTemp,
+    /// Display CO2, VOC index, and PM2.5 and PM10 mass concentrations
+    GasesAndParticles,
+}
+
+impl InfoType {
+    pub fn next(&self) -> Self {
+        match self {
+            Self::GasesAndTemp => Self::GasesAndParticles,
+            Self::GasesAndParticles => Self::GasesAndTemp,
+        }
     }
 }
