@@ -72,6 +72,15 @@ const TEMP_COLORS: [ColorSegment; 4] = [
     (1., 0., 0., 1.),
 ];
 
+const PM10_COLORS: [ColorSegment; 4] = [
+    // Set some points relative to some specific particle mass concentration values. 45 degrees will
+    // be the "maximum" temperature
+    (0., 0., 1., 0.),
+    (0., 1., 0., (10. / 50.)),
+    (1., 1., 0., (20. / 50.)),
+    (1., 0., 0., 1.),
+];
+
 pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f32, f32, f32) {
     let max_idx = colors.len() - 1;
     let float_idx: f32 = (max_idx as f32 * fraction).min(max_idx as f32);
@@ -166,4 +175,12 @@ pub fn temp_map(fraction: f32) -> (f32, f32, f32) {
 
 pub fn temp_map_rgb(fraction: f32) -> (u8, u8, u8) {
     fractions_to_rgb(temp_map(fraction))
+}
+
+pub fn pm10_map(fraction: f32) -> (f32, f32, f32) {
+    linear_position_interpolating_map(&PM10_COLORS, fraction)
+}
+
+pub fn pm10_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(pm10_map(fraction))
 }

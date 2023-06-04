@@ -56,8 +56,45 @@ fn main() -> ! {
         .write(
             [
                 RGB8::new(15, 0, 0),
-                RGB8::new(0, 15, 15),
-                RGB8::new(15, 0, 15),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+                .into_iter(),
+        )
+        .unwrap();
+    periodic_timer.delay_ms(300_u32);
+    smartled
+        .write(
+            [
+                RGB8::default(),
+                RGB8::new(15, 0, 0),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+                .into_iter(),
+        )
+        .unwrap();
+    periodic_timer.delay_ms(300_u32);
+    smartled
+        .write(
+            [
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::new(15, 0, 0),
+                RGB8::default(),
+            ]
+                .into_iter(),
+        )
+        .unwrap();
+    periodic_timer.delay_ms(300_u32);
+    smartled
+        .write(
+            [
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::new(15, 0, 0),
             ]
             .into_iter(),
         )
@@ -75,7 +112,15 @@ fn main() -> ! {
     // periodic_timer.delay_ms(300_u32);
 
     smartled
-        .write([RGB8::new(0, 15, 15), RGB8::default(), RGB8::default()].into_iter())
+        .write(
+            [
+                RGB8::new(0, 15, 15),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+            .into_iter(),
+        )
         .unwrap();
     periodic_timer.delay_ms(300_u32);
 
@@ -94,11 +139,27 @@ fn main() -> ! {
 
     let mut scd30 = SCD30::new(i2c_proxy_scd30);
     smartled
-        .write([RGB8::new(15, 0, 0), RGB8::default(), RGB8::default()].into_iter())
+        .write(
+            [
+                RGB8::new(15, 0, 0),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+            .into_iter(),
+        )
         .unwrap();
     let version = scd30.get_firmware_version().unwrap();
     smartled
-        .write([RGB8::new(0, 15, 0), RGB8::default(), RGB8::default()].into_iter())
+        .write(
+            [
+                RGB8::new(0, 15, 0),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+            .into_iter(),
+        )
         .unwrap();
     defmt::info!(
         "SCD30 firmware version: {=u8}.{=u8}",
@@ -106,7 +167,15 @@ fn main() -> ! {
         version.minor
     );
     smartled
-        .write([RGB8::new(15, 15, 0), RGB8::default(), RGB8::default()].into_iter())
+        .write(
+            [
+                RGB8::new(15, 15, 0),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+            .into_iter(),
+        )
         .unwrap();
     let desired_offset: f32 = 3.72;
     let temperature_offset = scd30.read_temperature_offset().unwrap();
@@ -120,13 +189,21 @@ fn main() -> ! {
         scd30.set_temperature_offset(desired_offset).unwrap();
     }
     smartled
-        .write([RGB8::new(0, 0, 15), RGB8::default(), RGB8::default()].into_iter())
+        .write(
+            [
+                RGB8::new(0, 0, 15),
+                RGB8::default(),
+                RGB8::default(),
+                RGB8::default(),
+            ]
+            .into_iter(),
+        )
         .unwrap();
 
     // Just shine some pretty colors in a loop for a while
-    let mut color_history = [RGB8::default(); 20];
+    let mut color_history = [RGB8::default(); 40];
     for i in 0..=100 {
-        let fraction = i as f32 / 100.;
+        let fraction = (i % 100) as f32 / 100.;
         let (r, g, b) = logic::colormap::co2_map_rgb(fraction);
         // Scale the values so that we retain eyesight
         let r = (r as f32 / 8.) as u8;
@@ -145,9 +222,14 @@ fn main() -> ! {
         } else {
             past_color_1
         };
+        let past_color_3 = if i >= 29 {
+            color_history[(l + i - 29) % l]
+        } else {
+            past_color_2
+        };
 
         smartled
-            .write([rgb, past_color_1, past_color_2].into_iter())
+            .write([rgb, past_color_1, past_color_2, past_color_3].into_iter())
             .unwrap();
 
         periodic_timer.delay_ms(30_u32);
@@ -259,6 +341,7 @@ fn main() -> ! {
     let mut rgb_co2 = RGB8::default();
     let mut rgb_voc = RGB8::default();
     let mut rgb_temp = RGB8::default();
+    let mut rgb_pm10 = RGB8::default();
     let mut pm25_data = sps30_i2c::AirInfo::default();
     let mut lcd_output_type = InfoType::GasesAndParticles;
     periodic_timer.start(1_000_000_u32);
@@ -289,15 +372,28 @@ fn main() -> ! {
             let b = (b as f32 / 8.) as u8;
             rgb_co2 = RGB8::new(r, g, b);
             smartled
-                .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
+                .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
                 .unwrap();
-
+        }
+        if seconds % 3 == 0 {
             loop {
                 if sps30.read_data_ready_flag().unwrap() {
                     break;
                 }
             }
             pm25_data = sps30.read_measured_values().unwrap();
+
+            let fraction = pm25_data.mass_pm10 / 50.;
+            let fraction = fraction.max(0.);
+            let (r, g, b) = logic::colormap::pm10_map_rgb(fraction);
+            // Scale the values so that we retain eyesight
+            let r = (r as f32 / 8.) as u8;
+            let g = (g as f32 / 8.) as u8;
+            let b = (b as f32 / 8.) as u8;
+            rgb_pm10 = RGB8::new(r, g, b);
+            smartled
+                .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
+                .unwrap();
         }
 
         if seconds % 5 == 0 {
@@ -312,7 +408,7 @@ fn main() -> ! {
             let b = (b as f32 / 8.) as u8;
             rgb_temp = RGB8::new(r, g, b);
             smartled
-                .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
+                .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
                 .unwrap();
         }
 
@@ -330,7 +426,7 @@ fn main() -> ! {
         let b = (b as f32 / 8.) as u8;
         rgb_voc = RGB8::new(r, g, b);
         smartled
-            .write([rgb_co2, rgb_voc, rgb_temp].into_iter())
+            .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
             .unwrap();
 
         if seconds % 5 == 0 {
