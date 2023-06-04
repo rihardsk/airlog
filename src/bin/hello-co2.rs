@@ -202,8 +202,9 @@ fn main() -> ! {
 
     // Just shine some pretty colors in a loop for a while
     let mut color_history = [RGB8::default(); 40];
-    for i in 0..=100 {
-        let fraction = (i % 100) as f32 / 100.;
+    for i in 0_usize..=200 {
+        // Those two abs_diffs make i go from 0 to 100 and then back to 0 again
+        let fraction = (i.abs_diff(100).abs_diff(100) % 101) as f32 / 100.;
         let (r, g, b) = logic::colormap::co2_map_rgb(fraction);
         // Scale the values so that we retain eyesight
         let r = (r as f32 / 8.) as u8;
