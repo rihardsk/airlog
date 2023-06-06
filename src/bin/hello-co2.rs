@@ -367,7 +367,7 @@ fn main() -> ! {
                 Some(pressure_data) => {
                     // 990 and 1040 hPa are min/max recorded atmospheric
                     // pressures in last 3 years
-                    let pressure_hpa = (pressure_data.pressure / 100.) as f32;
+                    let pressure_hpa = ((pressure_data.pressure / 100.) as f32).round();
                     let fraction = (pressure_hpa - 990.) / (1040. - 990.);
                     let fraction = fraction.max(0.);
                     let (r, g, b) = logic::colormap::pressure_map_rgb(fraction);
@@ -386,7 +386,7 @@ fn main() -> ! {
 
         if seconds % 3600 == 0 {
             if let Some(pressure_data) = pressure_data {
-                let pressure_hpa = (pressure_data.pressure / 100.) as u16;
+                let pressure_hpa = ((pressure_data.pressure / 100.) as f32).round() as u16;
                 defmt::info!("Setting SCD30 ambient pressure to {:?} hPa", pressure_hpa);
                 scd30.start_continuous_measurement(pressure_hpa).unwrap();
             }
@@ -552,7 +552,7 @@ fn main() -> ! {
                 InfoType::GasesPressureAndParticles => {
                     lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
                     let pressure_value =
-                        pressure_data.map(|pressure_data| pressure_data.pressure as f32);
+                        pressure_data.map(|pressure_data| (pressure_data.pressure as f32).round());
                     let pressure_text =
                         format_float_measurement_optional(pressure_value, 6, 0, "Pa");
                     lcd.write_str(&pressure_text, &mut lcd_timer).unwrap();
