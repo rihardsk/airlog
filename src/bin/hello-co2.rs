@@ -340,10 +340,10 @@ fn main() -> ! {
     let mut voc_index: u16;
     let mut builtin_led_state = hal::prelude::PinState::Low;
     let mut builtin_temperature: f32 = 25.;
-    let mut pressure_data: Option<bmp388::SensorData>;
+    let mut pressure_data: Option<bmp388::SensorData> = None;
     let mut rgb_co2 = RGB8::default();
     let mut rgb_voc = RGB8::default();
-    let mut rgb_temp = RGB8::default();
+    let mut rgb_pressure = RGB8::default();
     let mut rgb_pm10 = RGB8::default();
     let mut pm25_data = sps30_i2c::AirInfo::default();
     let mut lcd_output_type = InfoType::GasesPressureAndParticles;
@@ -377,7 +377,7 @@ fn main() -> ! {
             let b = (b as f32 / 8.) as u8;
             rgb_co2 = RGB8::new(r, g, b);
             smartled
-                .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
+                .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
                 .unwrap();
         }
         if seconds % 3 == 0 {
@@ -397,24 +397,24 @@ fn main() -> ! {
             let b = (b as f32 / 8.) as u8;
             rgb_pm10 = RGB8::new(r, g, b);
             smartled
-                .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
+                .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
                 .unwrap();
         }
 
         if seconds % 5 == 0 {
             builtin_temperature = temp.measure().to_num();
 
-            let fraction = builtin_temperature / 45.;
-            let fraction = fraction.max(0.);
-            let (r, g, b) = logic::colormap::temp_map_rgb(fraction);
-            // Scale the values so that we retain eyesight
-            let r = (r as f32 / 8.) as u8;
-            let g = (g as f32 / 8.) as u8;
-            let b = (b as f32 / 8.) as u8;
-            rgb_temp = RGB8::new(r, g, b);
-            smartled
-                .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
-                .unwrap();
+            // let fraction = builtin_temperature / 45.;
+            // let fraction = fraction.max(0.);
+            // let (r, g, b) = logic::colormap::temp_map_rgb(fraction);
+            // // Scale the values so that we retain eyesight
+            // let r = (r as f32 / 8.) as u8;
+            // let g = (g as f32 / 8.) as u8;
+            // let b = (b as f32 / 8.) as u8;
+            // rgb_temp = RGB8::new(r, g, b);
+            // smartled
+            //     .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
+            //     .unwrap();
         }
 
         let voc_temp = builtin_temperature.round() as i16;
@@ -431,7 +431,7 @@ fn main() -> ! {
         let b = (b as f32 / 8.) as u8;
         rgb_voc = RGB8::new(r, g, b);
         smartled
-            .write([rgb_co2, rgb_voc, rgb_temp, rgb_pm10].into_iter())
+            .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
             .unwrap();
 
         if seconds % 5 == 0 {
@@ -439,6 +439,28 @@ fn main() -> ! {
                 .as_mut()
                 .and_then(|sensor| sensor.sensor_values().ok());
 
+            rgb_pressure = match pressure_data {
+                Some(pressure_data) => {
+                    // 990 and 1040 hPa are min/max recorded atmospheric
+                    // pressures in last 3 years
+                    let pressure_hpa = (pressure_data.pressure / 100.) as f32;
+                    let fraction = (pressure_hpa - 990.) / (1040. - 990.);
+                    let fraction = fraction.max(0.);
+                    let (r, g, b) = logic::colormap::pressure_map_rgb(fraction);
+                    // Scale the values so that we retain eyesight
+                    let r = (r as f32 / 8.) as u8;
+                    let g = (g as f32 / 8.) as u8;
+                    let b = (b as f32 / 8.) as u8;
+                    RGB8::new(r, g, b)
+                }
+                None => RGB8::default(),
+            };
+            smartled
+                .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
+                .unwrap();
+        }
+
+        if seconds % 5 == 0 {
             // TODO: figure out how to specify {=Option<f64>} explicitly
             defmt::info!(
                 "

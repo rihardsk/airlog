@@ -81,6 +81,20 @@ const PM10_COLORS: [ColorSegment; 4] = [
     (1., 0., 0., 1.),
 ];
 
+#[rustfmt::skip]
+const PRESSURE_COLORS: [ColorSegment; 5] = [
+    // Globally recorded lowest (990 hPa), highest (1085 hPa) and mean (1013.25)
+    // atmospheric pressures at sea level are good reference points that we
+    // could use, but we'll opt for a greater resolution by selecting a smaller
+    // range – we'll use the 3 year minimum/maximum temperatures in Latvia
+    // (approx. 990 and 1040 hPa).
+    (0., 0., 1., 0.),
+    (0., 1., 1., ((1000. - 990.) / (1040. - 990.))),
+    (0., 1., 0., ((1013.25 - 990.) / (1040. - 990.))),
+    (1., 0., 0., ((1026. - 990.) / (1040. - 990.))),
+    (1., 0., 1., 1.),
+];
+
 pub fn linear_interpolating_map(colors: &[(f32, f32, f32)], fraction: f32) -> (f32, f32, f32) {
     let max_idx = colors.len() - 1;
     let float_idx: f32 = (max_idx as f32 * fraction).min(max_idx as f32);
@@ -183,4 +197,12 @@ pub fn pm10_map(fraction: f32) -> (f32, f32, f32) {
 
 pub fn pm10_map_rgb(fraction: f32) -> (u8, u8, u8) {
     fractions_to_rgb(pm10_map(fraction))
+}
+
+pub fn pressure_map(fraction: f32) -> (f32, f32, f32) {
+    linear_position_interpolating_map(&PRESSURE_COLORS, fraction)
+}
+
+pub fn pressure_map_rgb(fraction: f32) -> (u8, u8, u8) {
+    fractions_to_rgb(pressure_map(fraction))
 }
