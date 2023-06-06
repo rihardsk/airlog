@@ -18,7 +18,9 @@ use airlog::{
     self as _,
     logic::{
         self,
-        formatting::{format_float_measurement, format_u32_measurement},
+        formatting::{
+            format_float_measurement, format_float_measurement_optional, format_u32_measurement,
+        },
     },
     peripherals::{
         button::Button,
@@ -60,7 +62,7 @@ fn main() -> ! {
                 RGB8::default(),
                 RGB8::default(),
             ]
-                .into_iter(),
+            .into_iter(),
         )
         .unwrap();
     periodic_timer.delay_ms(300_u32);
@@ -72,7 +74,7 @@ fn main() -> ! {
                 RGB8::default(),
                 RGB8::default(),
             ]
-                .into_iter(),
+            .into_iter(),
         )
         .unwrap();
     periodic_timer.delay_ms(300_u32);
@@ -84,7 +86,7 @@ fn main() -> ! {
                 RGB8::new(15, 0, 0),
                 RGB8::default(),
             ]
-                .into_iter(),
+            .into_iter(),
         )
         .unwrap();
     periodic_timer.delay_ms(300_u32);
@@ -246,6 +248,22 @@ fn main() -> ! {
     // 0x76 is the address we get when the SDO pin of BMP388 is connected to
     // ground (as per documentation)
     let mut bmp388 = bmp388::BMP388::new(i2c_proxy_bmp388, 0x76, &mut periodic_timer).ok();
+    bmp388.as_mut().map(|sensor| {
+        sensor
+            .set_sampling_rate(bmp388::SamplingRate::ms160)
+            .unwrap()
+    });
+    bmp388
+        .as_mut()
+        .map(|sensor| sensor.set_filter(bmp388::Filter::c7).unwrap());
+    bmp388.as_mut().map(|sensor| {
+        sensor
+            .set_oversampling(bmp388::OversamplingConfig {
+                osr_p: bmp388::Oversampling::x8,
+                osr4_t: bmp388::Oversampling::x2,
+            })
+            .unwrap()
+    });
     // The choices here are rather arbitrary
     bmp388.as_mut().map(|sensor| {
         sensor
@@ -256,22 +274,6 @@ fn main() -> ! {
             })
             .unwrap()
     });
-    bmp388.as_mut().map(|sensor| {
-        sensor
-            .set_sampling_rate(bmp388::SamplingRate::ms10)
-            .unwrap()
-    });
-    bmp388
-        .as_mut()
-        .map(|sensor| sensor.set_filter(bmp388::Filter::c3).unwrap());
-    bmp388.as_mut().map(|sensor| {
-        sensor
-            .set_oversampling(bmp388::OversamplingConfig {
-                osr_p: bmp388::Oversampling::x4,
-                osr4_t: bmp388::Oversampling::x1,
-            })
-            .unwrap()
-    });
 
     defmt::info!("Initializing SPS30 particulate matter sensor");
     // TODO: do we need to pull the i2c lines up to 5V (in hardware, as per the
@@ -279,12 +281,12 @@ fn main() -> ! {
     let mut sps30 = sps30_i2c::Sps30::new_sps30(i2c_proxy_sps30, sps30_timer);
     let mut random = hal::rng::Rng::new(board.RNG);
     let rand_u8 = random.random_u8();
-    // Perform cleaning with p = 0.1, so that we don't needlessly do it on every
+    // Perform cleaning with p = 0.2, so that we don't needlessly do it on every
     // startup. There's also automatic cleaning, which we don't have to manage.
     // We do manual cleaning for occasions where the sensor doesn't run long
     // enough to trigger automatic cleaning (which happens after a week of
     // runtime).
-    let threshold = (u8::MAX as f32 / 10.) as u8;
+    let threshold = (u8::MAX as f32 / 5.) as u8;
     defmt::info!(
         "Rolled {=u8} (must not exceed {=u8} to perform cleaning)",
         rand_u8,
@@ -344,7 +346,8 @@ fn main() -> ! {
     let mut rgb_temp = RGB8::default();
     let mut rgb_pm10 = RGB8::default();
     let mut pm25_data = sps30_i2c::AirInfo::default();
-    let mut lcd_output_type = InfoType::GasesAndParticles;
+    let mut lcd_output_type = InfoType::GasesPressureAndParticles;
+    let mut clear_lcd = false;
     periodic_timer.start(1_000_000_u32);
     loop {
         // One loop iteration runs for a second, so the button must be held for
@@ -352,6 +355,7 @@ fn main() -> ! {
         if button.check_rising_edge() {
             lcd_output_type = lcd_output_type.next();
             defmt::info!("Switched output to {:?}", lcd_output_type);
+            clear_lcd = true;
         }
 
         // periodic_timer.start(1000_u32);
@@ -478,6 +482,11 @@ fn main() -> ! {
                 pm25_data.typical_size,
             );
 
+            if clear_lcd {
+                lcd.clear(&mut lcd_timer).unwrap();
+                clear_lcd = false;
+            }
+
             lcd.set_cursor_pos(0, &mut lcd_timer).unwrap();
             let co2_text = format_float_measurement(reading.co2, 4, 0, "ppm");
             lcd.write_str(&co2_text, &mut lcd_timer).unwrap();
@@ -510,6 +519,19 @@ fn main() -> ! {
                     let pm10_text = format_float_measurement(pm25_data.mass_pm10, 2, 1, "ug");
                     lcd.write_str(&pm10_text, &mut lcd_timer).unwrap();
                 }
+                InfoType::GasesPressureAndParticles => {
+                    lcd.set_cursor_pos(40, &mut lcd_timer).unwrap();
+                    let pressure_value =
+                        pressure_data.map(|pressure_data| pressure_data.pressure as f32);
+                    let pressure_text =
+                        format_float_measurement_optional(pressure_value, 6, 0, "Pa");
+                    lcd.write_str(&pressure_text, &mut lcd_timer).unwrap();
+
+                    // Can't have a space here, becuse there isn't enough horizontal space on the LCD
+                    // lcd.shift_cursor(Direction::Right, &mut lcd_timer).unwrap();
+                    let pm10_text = format_float_measurement(pm25_data.mass_pm10, 2, 1, "ug");
+                    lcd.write_str(&pm10_text, &mut lcd_timer).unwrap();
+                }
             }
         }
 
@@ -534,13 +556,16 @@ enum InfoType {
     GasesAndTemp,
     /// Display CO2, VOC index, and PM2.5 and PM10 mass concentrations
     GasesAndParticles,
+    /// Display CO2, VOC index, atmosphere pressure and PM10 mass concentrations
+    GasesPressureAndParticles,
 }
 
 impl InfoType {
     pub fn next(&self) -> Self {
         match self {
             Self::GasesAndTemp => Self::GasesAndParticles,
-            Self::GasesAndParticles => Self::GasesAndTemp,
+            Self::GasesAndParticles => Self::GasesPressureAndParticles,
+            Self::GasesPressureAndParticles => Self::GasesAndTemp,
         }
     }
 }

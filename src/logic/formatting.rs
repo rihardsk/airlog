@@ -13,6 +13,30 @@ fn u32_len(num: u32) -> u8 {
     count
 }
 
+pub fn format_u32_measurement_optional(
+    value: Option<u32>,
+    pad_main: u8,
+    unit: &str,
+) -> heapless::String<16> {
+    match value {
+        Some(value) => format_u32_measurement(value, pad_main, unit),
+        None => format_none(pad_main, unit),
+    }
+}
+
+fn format_none(pad_main: u8, unit: &str) -> heapless::String<16> {
+    let mut output: heapless::String<16> = heapless::String::new();
+    if pad_main > 0 {
+        for _ in 0..pad_main - 1 {
+            output.push_str(" ").unwrap();
+        }
+        output.push_str("-").unwrap();
+    }
+    output.push_str(" ").unwrap();
+    output.push_str(unit);
+    output
+}
+
 // TODO: fix output when value is 0
 // TODO: Works only on positive values, precision must be <=4
 pub fn format_u32_measurement(value: u32, pad_main: u8, unit: &str) -> heapless::String<16> {
@@ -25,6 +49,23 @@ pub fn format_u32_measurement(value: u32, pad_main: u8, unit: &str) -> heapless:
     ufmt::uwrite!(output, "{} {}", value, unit).unwrap();
 
     output
+}
+
+pub fn format_float_measurement_optional(
+    value: Option<f32>,
+    pad_main: u8,
+    precision: u8,
+    unit: &str,
+) -> heapless::String<16> {
+    match value {
+        Some(value) => format_float_measurement(value, pad_main, precision, unit),
+        None => format_none(
+            // Take into account the decimal separator that would have been
+            // added
+            pad_main + if precision > 0 { precision + 1 } else { 0 },
+            unit,
+        ),
+    }
 }
 
 // TODO: Works only on positive values, precision must be <=4
