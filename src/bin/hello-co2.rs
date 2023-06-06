@@ -327,7 +327,7 @@ fn main() -> ! {
     lcd.write_str("I'm on line 2!", &mut lcd_timer).unwrap();
 
     periodic_timer.delay_ms(500_u32);
-    scd30.start_continuous_measurement(1023).unwrap();
+    scd30.start_continuous_measurement(1013).unwrap();
     lcd.clear(&mut lcd_timer).unwrap();
 
     defmt::info!("Entering loop");
@@ -356,6 +356,40 @@ fn main() -> ! {
             lcd_output_type = lcd_output_type.next();
             defmt::info!("Switched output to {:?}", lcd_output_type);
             clear_lcd = true;
+        }
+
+        if seconds % 5 == 0 {
+            pressure_data = bmp388
+                .as_mut()
+                .and_then(|sensor| sensor.sensor_values().ok());
+
+            rgb_pressure = match pressure_data {
+                Some(pressure_data) => {
+                    // 990 and 1040 hPa are min/max recorded atmospheric
+                    // pressures in last 3 years
+                    let pressure_hpa = (pressure_data.pressure / 100.) as f32;
+                    let fraction = (pressure_hpa - 990.) / (1040. - 990.);
+                    let fraction = fraction.max(0.);
+                    let (r, g, b) = logic::colormap::pressure_map_rgb(fraction);
+                    // Scale the values so that we retain eyesight
+                    let r = (r as f32 / 8.) as u8;
+                    let g = (g as f32 / 8.) as u8;
+                    let b = (b as f32 / 8.) as u8;
+                    RGB8::new(r, g, b)
+                }
+                None => RGB8::default(),
+            };
+            smartled
+                .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
+                .unwrap();
+        }
+
+        if seconds % 3600 == 0 {
+            if let Some(pressure_data) = pressure_data {
+                let pressure_hpa = (pressure_data.pressure / 100.) as u16;
+                defmt::info!("Setting SCD30 ambient pressure to {:?} hPa", pressure_hpa);
+                scd30.start_continuous_measurement(pressure_hpa).unwrap();
+            }
         }
 
         // periodic_timer.start(1000_u32);
@@ -433,32 +467,6 @@ fn main() -> ! {
         smartled
             .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
             .unwrap();
-
-        if seconds % 5 == 0 {
-            pressure_data = bmp388
-                .as_mut()
-                .and_then(|sensor| sensor.sensor_values().ok());
-
-            rgb_pressure = match pressure_data {
-                Some(pressure_data) => {
-                    // 990 and 1040 hPa are min/max recorded atmospheric
-                    // pressures in last 3 years
-                    let pressure_hpa = (pressure_data.pressure / 100.) as f32;
-                    let fraction = (pressure_hpa - 990.) / (1040. - 990.);
-                    let fraction = fraction.max(0.);
-                    let (r, g, b) = logic::colormap::pressure_map_rgb(fraction);
-                    // Scale the values so that we retain eyesight
-                    let r = (r as f32 / 8.) as u8;
-                    let g = (g as f32 / 8.) as u8;
-                    let b = (b as f32 / 8.) as u8;
-                    RGB8::new(r, g, b)
-                }
-                None => RGB8::default(),
-            };
-            smartled
-                .write([rgb_co2, rgb_voc, rgb_pressure, rgb_pm10].into_iter())
-                .unwrap();
-        }
 
         if seconds % 5 == 0 {
             // TODO: figure out how to specify {=Option<f64>} explicitly
